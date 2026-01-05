@@ -1,0 +1,187 @@
+package cmd_test
+
+import (
+	"encoding/json"
+	"os"
+	"path/filepath"
+
+	"github.com/louiss0/go-toolkit/cmd"
+	"github.com/louiss0/go-toolkit/internal/modindex/config"
+	"github.com/louiss0/go-toolkit/internal/testhelpers"
+	. "github.com/onsi/ginkgo/v2"
+	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/mock"
+)
+
+var Config = Describe("config command", func() {
+	assert := assert.New(GinkgoT())
+
+	It("initializes config with defaults", func() {
+		runner := &testhelpers.RunnerMock{}
+		tempDir := GinkgoT().TempDir()
+		configPath := filepath.Join(tempDir, "config.toml")
+
+		rootCmd := cmd.NewRootCmdWithOptions(cmd.RootOptions{
+			Runner:     runner,
+			ConfigPath: configPath,
+		})
+
+		_, err := testhelpers.ExecuteCmd(rootCmd, "config", "init", "--user", "lou")
+
+		assert.NoError(err)
+
+		values, err := config.Load(configPath)
+		assert.NoError(err)
+		assert.Equal("lou", values.User)
+		assert.Equal("github.com", values.Site)
+	})
+
+	It("prompts for config init when no flags are provided", func() {
+		runner := &testhelpers.RunnerMock{}
+		tempDir := GinkgoT().TempDir()
+		configPath := filepath.Join(tempDir, "config.toml")
+
+		promptRunner := testhelpers.NewPromptRunnerMock(
+			testhelpers.PromptStep{Kind: testhelpers.PromptStepInput, Value: "lou"},
+			testhelpers.PromptStep{Kind: testhelpers.PromptStepSelect, Value: "gitlab.com"},
+		)
+
+		rootCmd := cmd.NewRootCmdWithOptions(cmd.RootOptions{
+			Runner:       runner,
+			PromptRunner: promptRunner,
+			ConfigPath:   configPath,
+		})
+
+		output, err := testhelpers.ExecuteCmd(rootCmd, "config", "init")
+
+		assert.NoError(err)
+
+		values, err := config.Load(configPath)
+		assert.NoError(err)
+		assert.Equal("lou", values.User)
+		assert.Equal("gitlab.com", values.Site)
+
+		var summary map[string]any
+		err = json.Unmarshal([]byte(output), &summary)
+		assert.NoError(err)
+		assert.Equal("gitlab.com", summary["site"])
+		assert.Equal("lou", summary["user"])
+	})
+
+	It("shows config values", func() {
+		runner := &testhelpers.RunnerMock{}
+		tempDir := GinkgoT().TempDir()
+		configPath := filepath.Join(tempDir, "config.toml")
+
+		err := os.WriteFile(configPath, []byte("user = \"lou\"\nsite = \"gitlab.com\"\n"), 0o644)
+		assert.NoError(err)
+
+		rootCmd := cmd.NewRootCmdWithOptions(cmd.RootOptions{
+			Runner:     runner,
+			ConfigPath: configPath,
+		})
+
+		output, err := testhelpers.ExecuteCmd(rootCmd, "config", "show")
+
+		assert.NoError(err)
+		var payload map[string]any
+		err = json.Unmarshal([]byte(output), &payload)
+		assert.NoError(err)
+		assert.Equal(configPath, payload["path"])
+		assert.Equal("gitlab.com", payload["site"])
+		assert.Equal("lou", payload["user"])
+	})
+
+	It("uses a repo-local gtk-config.toml when present", func() {
+		runner := &testhelpers.RunnerMock{}
+		tempDir := GinkgoT().TempDir()
+		configPath := filepath.Join(tempDir, "gtk-config.toml")
+
+		currentDir, err := os.Getwd()
+		assert.NoError(err)
+
+		err = os.Chdir(tempDir)
+		assert.NoError(err)
+		defer func() {
+			_ = os.Chdir(currentDir)
+		}()
+
+		err = os.WriteFile(configPath, []byte("user = \"lou\"\nsite = \"github.com\"\n"), 0o644)
+		assert.NoError(err)
+
+		rootCmd := cmd.NewRootCmdWithOptions(cmd.RootOptions{
+			Runner: runner,
+		})
+
+		output, err := testhelpers.ExecuteCmd(rootCmd, "config", "show")
+
+		assert.NoError(err)
+		var payload map[string]any
+		err = json.Unmarshal([]byte(output), &payload)
+		assert.NoError(err)
+		assert.Equal(configPath, payload["path"])
+	})
+
+	It("adds a provider mapping", func() {
+		runner := &testhelpers.RunnerMock{}
+		tempDir := GinkgoT().TempDir()
+		configPath := filepath.Join(tempDir, "config.toml")
+
+		rootCmd := cmd.NewRootCmdWithOptions(cmd.RootOptions{
+			Runner:     runner,
+			ConfigPath: configPath,
+		})
+
+		_, err := testhelpers.ExecuteCmd(rootCmd, "config", "provider", "add", "--name", "gitlab", "--path", "/tmp/gitlab")
+
+		assert.NoError(err)
+
+		values, err := config.Load(configPath)
+		assert.NoError(err)
+		assert.Len(values.Providers, 1)
+		assert.Equal("gitlab", values.Providers[0].Name)
+		assert.Equal("/tmp/gitlab", values.Providers[0].Path)
+	})
+
+	It("removes a provider mapping", func() {
+		runner := &testhelpers.RunnerMock{}
+		tempDir := GinkgoT().TempDir()
+		configPath := filepath.Join(tempDir, "config.toml")
+
+		err := os.WriteFile(configPath, []byte("[[providers]]\nname = \"gitlab\"\npath = \"/tmp/gitlab\"\n"), 0o644)
+		assert.NoError(err)
+
+		rootCmd := cmd.NewRootCmdWithOptions(cmd.RootOptions{
+			Runner:     runner,
+			ConfigPath: configPath,
+		})
+
+		_, err = testhelpers.ExecuteCmd(rootCmd, "config", "provider", "remove", "--name", "gitlab")
+
+		assert.NoError(err)
+
+		values, err := config.Load(configPath)
+		assert.NoError(err)
+		assert.Empty(values.Providers)
+	})
+
+	It("lists provider mappings", func() {
+		runner := &testhelpers.RunnerMock{}
+		tempDir := GinkgoT().TempDir()
+		configPath := filepath.Join(tempDir, "config.toml")
+
+		err := os.WriteFile(configPath, []byte("[[providers]]\nname = \"gitlab\"\npath = \"/tmp/gitlab\"\n"), 0o644)
+		assert.NoError(err)
+
+		rootCmd := cmd.NewRootCmdWithOptions(cmd.RootOptions{
+			Runner:     runner,
+			ConfigPath: configPath,
+		})
+
+		output, err := testhelpers.ExecuteCmd(rootCmd, "config", "provider", "list")
+
+		assert.NoError(err)
+		assert.Contains(output, "gitlab")
+		assert.Contains(output, "/tmp/gitlab")
+	})
+})
