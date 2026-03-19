@@ -3,6 +3,7 @@ package cmd
 import (
 	"errors"
 	"fmt"
+	"os"
 	"strconv"
 	"strings"
 
@@ -27,6 +28,7 @@ func NewConfigCmd(configPath *string, promptRunner prompt.Runner) *cobra.Command
 	cmd.AddCommand(newConfigSetSiteCmd(configPath))
 	cmd.AddCommand(newConfigSetScaffoldTestsCmd(configPath))
 	cmd.AddCommand(newConfigProviderCmd(configPath))
+	cmd.AddCommand(newConfigRemoveCmd(configPath))
 
 	return cmd
 }
@@ -426,6 +428,28 @@ func newConfigProviderListCmd(configPath *string) *cobra.Command {
 				fmt.Fprintf(cmd.OutOrStdout(), "%s\t%s\n", provider.Name, provider.Path)
 			}
 
+			return nil
+		},
+	}
+}
+
+func newConfigRemoveCmd(configPath *string) *cobra.Command {
+	return &cobra.Command{
+		Use:   "remove",
+		Short: "Remove the config file",
+		Args:  cobra.NoArgs,
+		RunE: func(cmd *cobra.Command, args []string) error {
+			targetPath := strings.TrimSpace(*configPath)
+			if targetPath == "" {
+				return custom_errors.CreateInvalidInputErrorWithMessage("config path is required")
+			}
+
+			cmdutil.LogInfoIfProduction("config remove: removing %s", targetPath)
+			if err := os.Remove(targetPath); err != nil && !errors.Is(err, os.ErrNotExist) {
+				return err
+			}
+
+			fmt.Fprintln(cmd.OutOrStdout(), "config file removed")
 			return nil
 		},
 	}
