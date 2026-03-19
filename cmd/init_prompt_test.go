@@ -7,7 +7,7 @@ import (
 	"github.com/stretchr/testify/assert"
 )
 
-var _ = Describe("Init prompt", func() {
+var InitPrompt = Describe("Init prompt", func() {
 	assert := assert.New(GinkgoT())
 
 	It("returns aborted when the module prompt is canceled", func() {
