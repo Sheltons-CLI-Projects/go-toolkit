@@ -1,3 +1,7 @@
+package main
+
+import "github.com/louiss0/go-toolkit/cmd"
+
 /*
 Copyright © 2025 Shelton Louis
 
@@ -19,8 +23,6 @@ LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
 OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN
 THE SOFTWARE.
 */
-
-import "github.com/louiss0/go-toolkit/cmd"
 
 func main() {
 	cmd.Execute()
