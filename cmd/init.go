@@ -14,6 +14,7 @@ import (
 	"github.com/louiss0/go-toolkit/internal/project"
 	"github.com/louiss0/go-toolkit/internal/prompt"
 	"github.com/louiss0/go-toolkit/internal/runner"
+	"github.com/samber/lo"
 	"github.com/spf13/cobra"
 )
 
@@ -376,17 +377,15 @@ func parsePackageList(value string) []string {
 		return r == ',' || unicode.IsSpace(r)
 	})
 
-	if len(parts) == 0 {
-		return nil
-	}
-
-	packages := make([]string, 0, len(parts))
-	for _, part := range parts {
+	packages := lo.FilterMap(parts, func(part string, _ int) (string, bool) {
 		trimmed := strings.TrimSpace(part)
 		if trimmed == "" {
-			continue
+			return "", false
 		}
-		packages = append(packages, trimmed)
+		return trimmed, true
+	})
+	if len(packages) == 0 {
+		return nil
 	}
 
 	return packages

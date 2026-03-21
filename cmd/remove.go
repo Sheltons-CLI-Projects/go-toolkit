@@ -29,10 +29,11 @@ func NewRemoveCmd(commandRunner runner.Runner, configPath *string) *cobra.Comman
 				return argErr
 			}
 
-			for _, input := range args {
-				if strings.Contains(input, "@none") {
-					return custom_errors.CreateInvalidInputErrorWithMessage("@none is added automatically; omit it from remove")
-				}
+			containsNoneTag := lo.ContainsBy(args, func(input string) bool {
+				return strings.Contains(input, "@none")
+			})
+			if containsNoneTag {
+				return custom_errors.CreateInvalidInputErrorWithMessage("@none is added automatically; omit it from remove")
 			}
 
 			return nil

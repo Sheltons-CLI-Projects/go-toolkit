@@ -29,10 +29,11 @@ func NewAddCmd(commandRunner runner.Runner, configPath *string) *cobra.Command {
 				return argErr
 			}
 
-			for _, input := range args {
-				if strings.Contains(input, "@none") {
-					return custom_errors.CreateInvalidInputErrorWithMessage("do not use @none with add; use remove instead")
-				}
+			containsNoneTag := lo.ContainsBy(args, func(input string) bool {
+				return strings.Contains(input, "@none")
+			})
+			if containsNoneTag {
+				return custom_errors.CreateInvalidInputErrorWithMessage("do not use @none with add; use remove instead")
 			}
 
 			return nil

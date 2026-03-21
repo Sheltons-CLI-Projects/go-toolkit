@@ -5,6 +5,7 @@ import (
 	"fmt"
 
 	"github.com/louiss0/go-toolkit/internal/prompt"
+	"github.com/samber/lo"
 	"github.com/spf13/cobra"
 )
 
@@ -54,7 +55,10 @@ func (m *promptMock) Select(_ *cobra.Command, selectInput prompt.Select) (string
 	if step.err != nil {
 		return "", step.err
 	}
-	if !containsOption(selectInput.Options, step.value) {
+	optionExists := lo.ContainsBy(selectInput.Options, func(option prompt.Option) bool {
+		return option.Value == step.value
+	})
+	if !optionExists {
 		return "", fmt.Errorf("unexpected selection: %s", step.value)
 	}
 	return step.value, nil
@@ -70,13 +74,4 @@ func (m *promptMock) next(expected promptStepKind) (promptStep, error) {
 		return promptStep{}, fmt.Errorf("prompt mock: expected %s, got %s", expected, step.kind)
 	}
 	return step, nil
-}
-
-func containsOption(options []prompt.Option, value string) bool {
-	for _, option := range options {
-		if option.Value == value {
-			return true
-		}
-	}
-	return false
 }

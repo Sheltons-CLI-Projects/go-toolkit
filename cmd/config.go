@@ -229,14 +229,14 @@ func promptConfigInitInputs(cmd *cobra.Command, runner prompt.Runner) (configIni
 
 func buildProviderOptions() []prompt.Option {
 	knownSites := config.KnownSites()
-	options := make([]prompt.Option, 0, len(knownSites)+3)
-	for _, site := range knownSites {
+	options := lo.Map(knownSites, func(site string, _ int) prompt.Option {
 		label := site
 		if knownLabel, ok := config.KnownSiteLabel(site); ok {
 			label = knownLabel
 		}
-		options = append(options, prompt.Option{Label: label, Value: site})
-	}
+		return prompt.Option{Label: label, Value: site}
+	})
+
 	options = append(options,
 		prompt.Option{Label: "Custom", Value: providerCustom},
 		prompt.Option{Label: "Skip", Value: providerSkip},
@@ -428,8 +428,11 @@ func newConfigProviderListCmd(configPath *string) *cobra.Command {
 				return err
 			}
 
-			for _, provider := range values.Providers {
-				fmt.Fprintf(cmd.OutOrStdout(), "%s\t%s\n", provider.Name, provider.Path)
+			rows := lo.Map(values.Providers, func(provider config.ProviderConfig, _ int) string {
+				return fmt.Sprintf("%s\t%s", provider.Name, provider.Path)
+			})
+			if len(rows) > 0 {
+				fmt.Fprintln(cmd.OutOrStdout(), strings.Join(rows, "\n"))
 			}
 
 			return nil
