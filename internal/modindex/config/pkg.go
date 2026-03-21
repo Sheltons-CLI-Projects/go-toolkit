@@ -6,29 +6,21 @@ import (
 	"os"
 	"path/filepath"
 	"regexp"
+	"slices"
 	"strings"
 
 	"github.com/kaptinlin/gozod"
-	"github.com/samber/lo"
 	"github.com/spf13/viper"
 )
 
 const DefaultSite = "github.com"
 
-var knownSites = map[string]struct{}{
-	"bitbucket.org": {},
-	"codeberg.org":  {},
-	"github.com":    {},
-	"gitea.com":     {},
-	"gitlab.com":    {},
-}
-
-var knownSiteOrder = []string{
-	"gitlab.com",
-	"bitbucket.org",
-	"github.com",
-	"codeberg.org",
-	"gitea.com",
+var knownSiteLabels = map[string]string{
+	"gitlab.com":    "GitLab",
+	"bitbucket.org": "BitBucket",
+	"github.com":    "GitHub",
+	"codeberg.org":  "Codeberg",
+	"gitea.com":     "Gitea",
 }
 
 type Values struct {
@@ -138,15 +130,23 @@ func ResolveSite(flagSite string, values Values) string {
 }
 
 func IsKnownSite(site string) bool {
-	_, ok := knownSites[site]
+	_, ok := knownSiteLabels[site]
 	return ok
 }
 
 func KnownSites() []string {
-	return lo.Filter(knownSiteOrder, func(site string, _ int) bool {
-		_, ok := knownSites[site]
-		return ok
-	})
+	sites := make([]string, 0, len(knownSiteLabels))
+	for site := range knownSiteLabels {
+		sites = append(sites, site)
+	}
+	slices.Sort(sites)
+
+	return sites
+}
+
+func KnownSiteLabel(site string) (string, bool) {
+	label, ok := knownSiteLabels[site]
+	return label, ok
 }
 
 func IsValidSite(site string) bool {
