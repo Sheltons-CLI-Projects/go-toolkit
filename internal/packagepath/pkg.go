@@ -5,6 +5,7 @@ import (
 	"strings"
 
 	"github.com/louiss0/go-toolkit/custom_errors"
+	"github.com/samber/lo"
 )
 
 var ErrMissingUser = errors.New("missing registered user")
@@ -20,12 +21,13 @@ func ResolveModulePath(input string, site string, user string) (string, error) {
 		return "", errors.New("module path is required")
 	}
 
-	parts := strings.Split(trimmed, "/")
-	for i, part := range parts {
-		parts[i] = strings.TrimSpace(part)
-		if parts[i] == "" {
-			return "", custom_errors.CreateInvalidInputErrorWithMessage("module path must not be empty")
-		}
+	parts := lo.Map(strings.Split(trimmed, "/"), func(part string, _ int) string {
+		return strings.TrimSpace(part)
+	})
+	if lo.ContainsBy(parts, func(part string) bool {
+		return part == ""
+	}) {
+		return "", custom_errors.CreateInvalidInputErrorWithMessage("module path must not be empty")
 	}
 
 	if len(parts) >= 3 {

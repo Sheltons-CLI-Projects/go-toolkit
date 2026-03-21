@@ -7,6 +7,7 @@ import (
 	"path/filepath"
 	"strings"
 
+	"github.com/samber/lo"
 	"gopkg.in/ini.v1"
 )
 
@@ -62,10 +63,11 @@ func providerNameForSite(site string) string {
 }
 
 func providerConfigPath(providers []ProviderConfig, name string) string {
-	for _, provider := range providers {
-		if provider.Name == name {
-			return provider.Path
-		}
+	provider, ok := lo.Find(providers, func(provider ProviderConfig) bool {
+		return provider.Name == name
+	})
+	if ok {
+		return provider.Path
 	}
 
 	return ""

@@ -5,6 +5,7 @@ import (
 
 	"github.com/charmbracelet/huh"
 	"github.com/louiss0/g-tools/mode"
+	"github.com/samber/lo"
 	"github.com/spf13/cobra"
 )
 
@@ -71,10 +72,9 @@ func (r HuhRunner) Select(cmd *cobra.Command, selectInput Select) (string, error
 
 	value := ""
 	field := huh.NewSelect[string]().Title(selectInput.Title).Value(&value)
-	options := make([]huh.Option[string], 0, len(selectInput.Options))
-	for _, option := range selectInput.Options {
-		options = append(options, huh.NewOption(option.Label, option.Value))
-	}
+	options := lo.Map(selectInput.Options, func(option Option, _ int) huh.Option[string] {
+		return huh.NewOption(option.Label, option.Value)
+	})
 	if len(options) > 0 {
 		field.Options(options...)
 	}

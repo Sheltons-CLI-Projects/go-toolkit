@@ -7,6 +7,8 @@ import (
 	"strings"
 	"unicode"
 	"unicode/utf8"
+
+	"github.com/samber/lo"
 )
 
 type Options struct {
@@ -74,13 +76,11 @@ func testFunctionName(packageName string) string {
 		return "TestPackage"
 	}
 
-	var builder strings.Builder
-	builder.WriteString("Test")
-	for _, part := range parts {
-		builder.WriteString(capitalize(part))
-	}
+	titleParts := lo.Map(parts, func(part string, _ int) string {
+		return capitalize(part)
+	})
 
-	return builder.String()
+	return "Test" + strings.Join(titleParts, "")
 }
 
 func capitalize(value string) string {

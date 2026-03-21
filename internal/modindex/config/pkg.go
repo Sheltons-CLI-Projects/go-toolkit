@@ -10,6 +10,7 @@ import (
 	"strings"
 
 	"github.com/kaptinlin/gozod"
+	"github.com/samber/lo"
 	"github.com/spf13/viper"
 )
 
@@ -130,15 +131,11 @@ func ResolveSite(flagSite string, values Values) string {
 }
 
 func IsKnownSite(site string) bool {
-	_, ok := knownSiteLabels[site]
-	return ok
+	return lo.HasKey(knownSiteLabels, site)
 }
 
 func KnownSites() []string {
-	sites := make([]string, 0, len(knownSiteLabels))
-	for site := range knownSiteLabels {
-		sites = append(sites, site)
-	}
+	sites := lo.Keys(knownSiteLabels)
 	slices.Sort(sites)
 
 	return sites
