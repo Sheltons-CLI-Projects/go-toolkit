@@ -4,6 +4,8 @@ import (
 	"errors"
 	"os"
 	"path/filepath"
+
+	"github.com/louiss0/go-toolkit/validation"
 )
 
 const mainTemplate = `package main
@@ -17,8 +19,8 @@ type Options struct {
 }
 
 func EnsureLayout(root string, options Options) error {
-	if root == "" {
-		return errors.New("root path is required")
+	if _, err := validation.RequiredString(root, "root path"); err != nil {
+		return err
 	}
 
 	if options.WriteInternal {

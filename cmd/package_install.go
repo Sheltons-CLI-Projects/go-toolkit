@@ -10,6 +10,7 @@ import (
 	"github.com/louiss0/go-toolkit/internal/cmdutil"
 	"github.com/louiss0/go-toolkit/internal/modindex/config"
 	"github.com/louiss0/go-toolkit/internal/prompt"
+	"github.com/louiss0/go-toolkit/validation"
 	"github.com/samber/lo"
 	"github.com/spf13/cobra"
 )
@@ -111,10 +112,11 @@ func promptPackageProvider(cmd *cobra.Command, runner prompt.Runner, defaultSite
 		Title:       "Custom provider",
 		Placeholder: defaultSite,
 		Validate: func(value string) error {
-			if strings.TrimSpace(value) == "" {
-				return errors.New("provider is required")
+			trimmed, err := validation.RequiredString(value, "provider")
+			if err != nil {
+				return err
 			}
-			return cmdutil.ValidateSite(value, true)
+			return cmdutil.ValidateSite(trimmed, true)
 		},
 	})
 	if err != nil {

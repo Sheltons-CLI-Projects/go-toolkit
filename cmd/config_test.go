@@ -247,6 +247,32 @@ var Config = Describe("config command", func() {
 		assert.Contains(output, "github.com/spf13/cobra")
 	})
 
+	It("rejects empty package preset keys during flag validation", func() {
+		runner := &testhelpers.RunnerMock{}
+		tempDir := GinkgoT().TempDir()
+		configPath := filepath.Join(tempDir, "config.toml")
+
+		rootCmd := cmd.NewRootCmdWithOptions(cmd.RootOptions{
+			Runner:       runner,
+			PromptRunner: testhelpers.NewPromptRunnerMock(),
+			ConfigPath:   configPath,
+		})
+
+		_, err := testhelpers.ExecuteCmd(
+			rootCmd,
+			"config",
+			"package-preset",
+			"add",
+			"--name",
+			"   ",
+			"--package",
+			"github.com/spf13/cobra",
+		)
+
+		assert.Error(err)
+		assert.Contains(err.Error(), "package preset name is required")
+	})
+
 	It("updates provider assurance", func() {
 		runner := &testhelpers.RunnerMock{}
 		tempDir := GinkgoT().TempDir()

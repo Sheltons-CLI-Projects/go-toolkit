@@ -13,6 +13,7 @@ import (
 	"github.com/louiss0/go-toolkit/internal/project"
 	"github.com/louiss0/go-toolkit/internal/prompt"
 	"github.com/louiss0/go-toolkit/internal/runner"
+	"github.com/louiss0/go-toolkit/validation"
 	"github.com/spf13/cobra"
 )
 
@@ -46,8 +47,8 @@ func NewInitCmd(commandRunner runner.Runner, promptRunner prompt.Runner, configP
 				moduleInput = args[0]
 			}
 
-			if strings.TrimSpace(moduleInput) == "" {
-				return custom_errors.CreateInvalidInputErrorWithMessage("module name is required")
+			if _, err := validation.RequiredString(moduleInput, "module name"); err != nil {
+				return err
 			}
 
 			cmdutil.LogInfoIfProduction("init: loading config")
@@ -238,10 +239,8 @@ func promptInitInputs(cmd *cobra.Command, runner prompt.Runner) (initPrompt, err
 		Title:       "Module name",
 		Placeholder: "go-toolkit",
 		Validate: func(value string) error {
-			if strings.TrimSpace(value) == "" {
-				return errors.New("module name is required")
-			}
-			return nil
+			_, err := validation.RequiredString(value, "module name")
+			return err
 		},
 	})
 	if err != nil {
@@ -287,10 +286,11 @@ func promptInitInputs(cmd *cobra.Command, runner prompt.Runner) (initPrompt, err
 			Title:       "Custom provider",
 			Placeholder: "github.com",
 			Validate: func(value string) error {
-				if strings.TrimSpace(value) == "" {
-					return errors.New("provider is required")
+				trimmed, err := validation.RequiredString(value, "provider")
+				if err != nil {
+					return err
 				}
-				return cmdutil.ValidateSite(value, true)
+				return cmdutil.ValidateSite(trimmed, true)
 			},
 		})
 		if err != nil {

@@ -8,6 +8,7 @@ import (
 	"unicode"
 	"unicode/utf8"
 
+	"github.com/louiss0/go-toolkit/validation"
 	"github.com/samber/lo"
 )
 
@@ -19,12 +20,12 @@ type Options struct {
 }
 
 func Create(folder string, options Options) error {
-	if options.PackageName == "" {
-		return fmt.Errorf("package name is required")
+	if _, err := validation.RequiredString(options.PackageName, "package name"); err != nil {
+		return err
 	}
 
-	if folder == "" {
-		return fmt.Errorf("folder path is required")
+	if _, err := validation.RequiredString(folder, "folder path"); err != nil {
+		return err
 	}
 
 	if err := os.MkdirAll(folder, 0o755); err != nil {

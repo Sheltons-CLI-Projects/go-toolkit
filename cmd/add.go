@@ -12,6 +12,7 @@ import (
 	"github.com/louiss0/go-toolkit/internal/packagepath"
 	"github.com/louiss0/go-toolkit/internal/prompt"
 	"github.com/louiss0/go-toolkit/internal/runner"
+	"github.com/louiss0/go-toolkit/validation"
 	"github.com/samber/lo"
 	"github.com/spf13/cobra"
 )
@@ -131,7 +132,7 @@ func promptAddPackages(cmd *cobra.Command, runner prompt.Runner) ([]string, erro
 		Description: "Space or comma separated package paths; presets can be used with --preset.",
 		Placeholder: "samber/lo, stretchr/testify",
 		Validate: func(value string) error {
-			if len(parsePackageList(value)) == 0 {
+			if _, err := validation.NonEmptyStrings(parsePackageList(value), "package values"); err != nil || len(parsePackageList(value)) == 0 {
 				return errors.New("at least one package is required")
 			}
 			return nil

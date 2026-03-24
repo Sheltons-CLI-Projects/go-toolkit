@@ -1,0 +1,90 @@
+package validation
+
+import (
+	"regexp"
+	"strconv"
+	"strings"
+
+	"github.com/kaptinlin/gozod"
+	"github.com/louiss0/go-toolkit/custom_errors"
+	"github.com/samber/lo"
+)
+
+var (
+	requiredStringSchema = gozod.String().Regex(regexp.MustCompile(`.+`))
+	siteSchema           = gozod.String().Regex(regexp.MustCompile(`^[^\s.][^\s]*\.[^\s]*[^\s.]$`))
+	booleanStringSchema  = gozod.String().Regex(regexp.MustCompile(`(?i)^(1|0|t|f|true|false)$`))
+)
+
+func RequiredString(value string, field string) (string, error) {
+	trimmed := strings.TrimSpace(value)
+	if _, err := requiredStringSchema.Parse(trimmed); err != nil {
+		return "", custom_errors.CreateInvalidInputErrorWithMessage(field + " is required")
+	}
+
+	return trimmed, nil
+}
+
+func NonEmptyStrings(values []string, field string) ([]string, error) {
+	trimmedValues := lo.Map(values, func(value string, _ int) string {
+		return strings.TrimSpace(value)
+	})
+	if lo.ContainsBy(trimmedValues, func(value string) bool {
+		return value == ""
+	}) {
+		return nil, custom_errors.CreateInvalidInputErrorWithMessage(field + " must not be empty")
+	}
+
+	return trimmedValues, nil
+}
+
+func ParseBool(value string, field string) (bool, error) {
+	trimmed := strings.TrimSpace(value)
+	if _, err := booleanStringSchema.Parse(trimmed); err != nil {
+		return false, custom_errors.CreateInvalidInputErrorWithMessage(field + " must be true or false")
+	}
+
+	parsedValue, err := strconv.ParseBool(trimmed)
+	if err != nil {
+		return false, custom_errors.CreateInvalidInputErrorWithMessage(field + " must be true or false")
+	}
+
+	return parsedValue, nil
+}
+
+func IsValidSite(site string) bool {
+	trimmed := strings.TrimSpace(site)
+	if trimmed == "" {
+		return false
+	}
+
+	if _, err := siteSchema.Parse(trimmed); err != nil {
+		return false
+	}
+
+	return true
+}
+
+func ValidateSite(site string, allowFull bool, knownSites []string) error {
+	trimmed := strings.TrimSpace(site)
+	if trimmed == "" {
+		return nil
+	}
+
+	if _, err := siteSchema.Parse(trimmed); err != nil {
+		return custom_errors.CreateInvalidInputErrorWithMessage("site must be in the form sitename.domain")
+	}
+
+	if allowFull {
+		return nil
+	}
+
+	if _, err := gozod.Enum(knownSites...).Parse(trimmed); err == nil {
+		return nil
+	}
+
+	known := strings.Join(knownSites, ", ")
+	return custom_errors.CreateInvalidInputErrorWithMessage(
+		"unsupported site " + trimmed + " (known: " + known + "). use --full to allow custom sites",
+	)
+}

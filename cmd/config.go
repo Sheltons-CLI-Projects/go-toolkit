@@ -4,7 +4,6 @@ import (
 	"errors"
 	"fmt"
 	"os"
-	"strconv"
 	"strings"
 
 	"github.com/charmbracelet/huh"
@@ -12,6 +11,7 @@ import (
 	"github.com/louiss0/go-toolkit/internal/cmdutil"
 	"github.com/louiss0/go-toolkit/internal/modindex/config"
 	"github.com/louiss0/go-toolkit/internal/prompt"
+	"github.com/louiss0/go-toolkit/validation"
 	"github.com/samber/lo"
 	"github.com/spf13/cobra"
 )
@@ -47,7 +47,12 @@ func newConfigSetUserCmd(configPath *string) *cobra.Command {
 				return err
 			}
 
-			values.User = args[0]
+			user, err := validation.RequiredString(args[0], "user")
+			if err != nil {
+				return err
+			}
+
+			values.User = user
 			if err := config.Save(*configPath, values); err != nil {
 				return err
 			}
@@ -99,9 +104,9 @@ func newConfigSetAssureProvidersCmd(configPath *string) *cobra.Command {
 		Short: "Enable or disable provider assurance for short package paths",
 		Args:  cobra.ExactArgs(1),
 		RunE: func(cmd *cobra.Command, args []string) error {
-			enabled, err := strconv.ParseBool(args[0])
+			enabled, err := validation.ParseBool(args[0], "enabled")
 			if err != nil {
-				return custom_errors.CreateInvalidInputErrorWithMessage("enabled must be true or false")
+				return err
 			}
 
 			cmdutil.LogInfoIfProduction("config set-assure-providers: loading config")
@@ -205,10 +210,8 @@ func promptConfigInitInputs(cmd *cobra.Command, runner prompt.Runner) (configIni
 		Title:       "Username",
 		Placeholder: "lou",
 		Validate: func(value string) error {
-			if strings.TrimSpace(value) == "" {
-				return errors.New("username is required")
-			}
-			return nil
+			_, err := validation.RequiredString(value, "username")
+			return err
 		},
 	})
 	if err != nil {
@@ -239,10 +242,11 @@ func promptConfigInitInputs(cmd *cobra.Command, runner prompt.Runner) (configIni
 			Title:       "Custom provider",
 			Placeholder: "github.com",
 			Validate: func(value string) error {
-				if strings.TrimSpace(value) == "" {
-					return errors.New("provider is required")
+				trimmed, err := validation.RequiredString(value, "provider")
+				if err != nil {
+					return err
 				}
-				return cmdutil.ValidateSite(value, true)
+				return cmdutil.ValidateSite(trimmed, true)
 			},
 		})
 		if err != nil {
@@ -338,9 +342,9 @@ func newConfigSetScaffoldTestsCmd(configPath *string) *cobra.Command {
 		Short: "Enable or disable scaffold test generation",
 		Args:  cobra.ExactArgs(1),
 		RunE: func(cmd *cobra.Command, args []string) error {
-			enabled, err := strconv.ParseBool(args[0])
+			enabled, err := validation.ParseBool(args[0], "enabled")
 			if err != nil {
-				return custom_errors.CreateInvalidInputErrorWithMessage("enabled must be true or false")
+				return err
 			}
 
 			cmdutil.LogInfoIfProduction("config set-scaffold-tests: loading config")
@@ -394,11 +398,13 @@ func newConfigProviderAddCmd(configPath *string) *cobra.Command {
 		Use:   "add",
 		Short: "Add a provider config mapping",
 		RunE: func(cmd *cobra.Command, args []string) error {
-			if strings.TrimSpace(nameFlag) == "" {
-				return custom_errors.CreateInvalidInputErrorWithMessage("provider name is required")
+			name, err := validation.RequiredString(nameFlag, "provider name")
+			if err != nil {
+				return err
 			}
-			if strings.TrimSpace(pathFlag) == "" {
-				return custom_errors.CreateInvalidInputErrorWithMessage("provider path is required")
+			path, err := validation.RequiredString(pathFlag, "provider path")
+			if err != nil {
+				return err
 			}
 
 			cmdutil.LogInfoIfProduction("config providers add: loading config")
@@ -408,8 +414,8 @@ func newConfigProviderAddCmd(configPath *string) *cobra.Command {
 			}
 
 			entry := config.ProviderConfig{
-				Name: nameFlag,
-				Path: pathFlag,
+				Name: name,
+				Path: path,
 			}
 
 			values.Providers = append(values.Providers, entry)
@@ -435,8 +441,9 @@ func newConfigProviderRemoveCmd(configPath *string) *cobra.Command {
 		Use:   "remove",
 		Short: "Remove a provider config mapping",
 		RunE: func(cmd *cobra.Command, args []string) error {
-			if strings.TrimSpace(nameFlag) == "" {
-				return custom_errors.CreateInvalidInputErrorWithMessage("provider name is required")
+			name, err := validation.RequiredString(nameFlag, "provider name")
+			if err != nil {
+				return err
 			}
 
 			cmdutil.LogInfoIfProduction("config providers remove: loading config")
@@ -446,7 +453,7 @@ func newConfigProviderRemoveCmd(configPath *string) *cobra.Command {
 			}
 
 			filtered := lo.Filter(values.Providers, func(item config.ProviderConfig, _ int) bool {
-				return item.Name != nameFlag
+				return item.Name != name
 			})
 
 			if len(filtered) == len(values.Providers) {
@@ -498,14 +505,24 @@ func newConfigPackagePresetAddCmd(configPath *string) *cobra.Command {
 	cmd := &cobra.Command{
 		Use:   "add",
 		Short: "Add a package install preset",
-		RunE: func(cmd *cobra.Command, args []string) error {
-			if strings.TrimSpace(nameFlag) == "" {
-				return custom_errors.CreateInvalidInputErrorWithMessage("package preset name is required")
+		PreRunE: func(cmd *cobra.Command, args []string) error {
+			name, err := validation.RequiredString(nameFlag, "package preset name")
+			if err != nil {
+				return err
 			}
 			if len(packageFlags) == 0 {
 				return custom_errors.CreateInvalidInputErrorWithMessage("at least one package is required")
 			}
+			trimmedPackages, err := validation.NonEmptyStrings(packageFlags, "package values")
+			if err != nil {
+				return err
+			}
+			nameFlag = name
+			packageFlags = trimmedPackages
 
+			return nil
+		},
+		RunE: func(cmd *cobra.Command, args []string) error {
 			cmdutil.LogInfoIfProduction("config package preset add: loading config")
 			values, err := config.Load(*configPath)
 			if err != nil {
@@ -537,11 +554,16 @@ func newConfigPackagePresetRemoveCmd(configPath *string) *cobra.Command {
 	cmd := &cobra.Command{
 		Use:   "remove",
 		Short: "Remove a package install preset",
-		RunE: func(cmd *cobra.Command, args []string) error {
-			if strings.TrimSpace(nameFlag) == "" {
-				return custom_errors.CreateInvalidInputErrorWithMessage("package preset name is required")
+		PreRunE: func(cmd *cobra.Command, args []string) error {
+			name, err := validation.RequiredString(nameFlag, "package preset name")
+			if err != nil {
+				return err
 			}
+			nameFlag = name
 
+			return nil
+		},
+		RunE: func(cmd *cobra.Command, args []string) error {
 			cmdutil.LogInfoIfProduction("config package preset remove: loading config")
 			values, err := config.Load(*configPath)
 			if err != nil {

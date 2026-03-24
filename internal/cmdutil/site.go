@@ -1,39 +1,13 @@
 package cmdutil
 
 import (
-	"regexp"
-	"strings"
-
-	"github.com/kaptinlin/gozod"
-	"github.com/louiss0/go-toolkit/custom_errors"
 	"github.com/louiss0/go-toolkit/internal/modindex/config"
+	"github.com/louiss0/go-toolkit/validation"
 	"github.com/spf13/cobra"
 )
 
-var siteSchema = gozod.String().Regex(regexp.MustCompile(`^[^\s.][^\s]*\.[^\s]*[^\s.]$`))
-
 func ValidateSite(site string, allowFull bool) error {
-	trimmed := strings.TrimSpace(site)
-	if trimmed == "" {
-		return nil
-	}
-
-	if _, err := siteSchema.Parse(trimmed); err != nil {
-		return custom_errors.CreateInvalidInputErrorWithMessage("site must be in the form sitename.domain")
-	}
-
-	if allowFull {
-		return nil
-	}
-
-	if _, err := gozod.Enum(config.KnownSites()...).Parse(trimmed); err == nil {
-		return nil
-	}
-
-	known := strings.Join(config.KnownSites(), ", ")
-	return custom_errors.CreateInvalidInputErrorWithMessage(
-		"unsupported site " + trimmed + " (known: " + known + "). use --full to allow custom sites",
-	)
+	return validation.ValidateSite(site, allowFull, config.KnownSites())
 }
 
 func RegisterSiteCompletion(cmd *cobra.Command, flagName string) {

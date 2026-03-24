@@ -5,6 +5,7 @@ import (
 	"strings"
 
 	"github.com/louiss0/go-toolkit/custom_errors"
+	"github.com/louiss0/go-toolkit/validation"
 	"github.com/samber/lo"
 )
 
@@ -16,9 +17,9 @@ func NormalizePackageName(value string) string {
 }
 
 func ResolveModulePath(input string, site string, user string) (string, error) {
-	trimmed := strings.TrimSpace(input)
-	if trimmed == "" {
-		return "", errors.New("module path is required")
+	trimmed, err := validation.RequiredString(input, "module path")
+	if err != nil {
+		return "", err
 	}
 
 	parts := lo.Map(strings.Split(trimmed, "/"), func(part string, _ int) string {
@@ -41,7 +42,7 @@ func ResolveModulePath(input string, site string, user string) (string, error) {
 	}
 
 	if len(parts) == 2 {
-		if !isValidSite(site) {
+		if !validation.IsValidSite(site) {
 			return "", custom_errors.CreateInvalidInputErrorWithMessage("site must be in the form sitename.domain")
 		}
 		return joinPath(site, parts[0], parts[1]), nil
@@ -51,7 +52,7 @@ func ResolveModulePath(input string, site string, user string) (string, error) {
 		if user == "" {
 			return "", ErrMissingUser
 		}
-		if !isValidSite(site) {
+		if !validation.IsValidSite(site) {
 			return "", custom_errors.CreateInvalidInputErrorWithMessage("site must be in the form sitename.domain")
 		}
 		return joinPath(site, user, parts[0]), nil
@@ -67,17 +68,4 @@ func joinPath(site string, parts ...string) string {
 
 	segments := append([]string{site}, parts...)
 	return strings.Join(segments, "/")
-}
-
-func isValidSite(site string) bool {
-	trimmed := strings.TrimSpace(site)
-	if trimmed == "" {
-		return false
-	}
-
-	if strings.Contains(trimmed, " ") {
-		return false
-	}
-
-	return strings.Contains(trimmed, ".") && !strings.HasPrefix(trimmed, ".") && !strings.HasSuffix(trimmed, ".")
 }

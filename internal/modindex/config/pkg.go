@@ -5,11 +5,11 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
-	"regexp"
 	"slices"
 	"strings"
 
 	"github.com/kaptinlin/gozod"
+	"github.com/louiss0/go-toolkit/validation"
 	"github.com/samber/lo"
 	"github.com/spf13/viper"
 )
@@ -43,7 +43,6 @@ type ScaffoldConfig struct {
 }
 
 var valuesSchema = gozod.FromStruct[Values]()
-var siteSchema = gozod.String().Regex(regexp.MustCompile(`^[^\s.][^\s]*\.[^\s]*[^\s.]$`))
 
 func DefaultPath() (string, error) {
 	if xdgConfigHome := strings.TrimSpace(os.Getenv("XDG_CONFIG_HOME")); xdgConfigHome != "" {
@@ -156,13 +155,5 @@ func KnownSiteLabel(site string) (string, bool) {
 }
 
 func IsValidSite(site string) bool {
-	trimmed := strings.TrimSpace(site)
-	if trimmed == "" {
-		return false
-	}
-
-	if _, err := siteSchema.Parse(trimmed); err != nil {
-		return false
-	}
-	return true
+	return validation.IsValidSite(site)
 }
