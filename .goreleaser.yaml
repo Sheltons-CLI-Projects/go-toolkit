@@ -38,16 +38,18 @@ release:
 
 winget:
   - name: go-toolkit
-    publisher: the-code-fixer-23
-    short_description: "CLI for Go module workflows and scaffolding."
+    publisher: Shelton Louis
+    short_description: "CLI for Go scaffolding and module maintenance."
+    description: "Scaffold Go projects, add or remove module dependencies, manage providers, and reuse package presets from the command line."
     homepage: "https://github.com/louiss0/go-toolkit"
     license: MIT
     license_url: "https://github.com/louiss0/go-toolkit/blob/main/LICENSE"
     copyright: "Copyright (c) 2025 Shelton Louis"
     publisher_url: "https://github.com/louiss0"
     publisher_support_url: "https://github.com/louiss0/go-toolkit/issues/new"
-    package_identifier: the-code-fixer-23.go-toolkit
-    path: manifests/t/the-code-fixer-23/go-toolkit/{{ .Version }}
+    package_identifier: SheltonLouis.GoToolkit
+    package_name: "go-toolkit"
+    path: manifests/s/SheltonLouis/go-toolkit/{{ .Version }}
     commit_msg_template: "{{ .PackageIdentifier }}: {{ .Tag }}"
     release_notes: "{{.Changelog}}"
     release_notes_url: "https://github.com/louiss0/go-toolkit/releases/tag/{{ .Tag }}"
@@ -72,7 +74,6 @@ winget:
 homebrew_casks:
   - name: go-toolkit
     binaries:
-      - go-toolkit
       - gtk
     commit_msg_template: "Brew cask update for {{ .ProjectName }} version {{ .Tag }}"
     homepage: "https://github.com/louiss0/go-toolkit"
