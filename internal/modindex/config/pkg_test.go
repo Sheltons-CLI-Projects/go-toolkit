@@ -89,7 +89,7 @@ var _ = Describe("ConfigLoadSave", func() {
 				{Name: "gitlab", Path: "/tmp/gitlab"},
 			},
 			PackagePresets: map[string][]string{
-				"cli": []string{"github.com/spf13/cobra"},
+				"cli": {"github.com/spf13/cobra"},
 			},
 		}
 
@@ -132,7 +132,7 @@ var _ = Describe("ConfigLoadSave", func() {
 		path := filepath.Join(GinkgoT().TempDir(), "config.toml")
 		values := config.Values{
 			PackagePresets: map[string][]string{
-				"": []string{"github.com/spf13/cobra"},
+				"": {"github.com/spf13/cobra"},
 			},
 		}
 
@@ -269,8 +269,8 @@ var _ = Describe("ResolvePackagePresetPackages", func() {
 	It("resolves packages from known presets", func() {
 		values := config.Values{
 			PackagePresets: map[string][]string{
-				"cli":  []string{"github.com/spf13/cobra", "github.com/spf13/viper"},
-				"test": []string{"github.com/stretchr/testify"},
+				"cli":  {"github.com/spf13/cobra", "github.com/spf13/viper"},
+				"test": {"github.com/stretchr/testify"},
 			},
 		}
 
