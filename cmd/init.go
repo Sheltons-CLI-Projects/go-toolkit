@@ -7,6 +7,7 @@ import (
 
 	"github.com/charmbracelet/huh"
 	"github.com/louiss0/go-toolkit/custom_errors"
+	"github.com/louiss0/go-toolkit/custom_flags"
 	"github.com/louiss0/go-toolkit/internal/cmdutil"
 	"github.com/louiss0/go-toolkit/internal/modindex/config"
 	"github.com/louiss0/go-toolkit/internal/packagepath"
@@ -18,8 +19,8 @@ import (
 )
 
 func NewInitCmd(commandRunner runner.Runner, promptRunner prompt.Runner, configPath *string) *cobra.Command {
-	var siteFlag string
-	var userFlag string
+	siteFlag := custom_flags.NewEmptyStringFlag("site")
+	userFlag := custom_flags.NewEmptyStringFlag("user")
 	var allowFull bool
 	var packageFlags []string
 	var presetFlags []string
@@ -76,8 +77,8 @@ func NewInitCmd(commandRunner runner.Runner, promptRunner prompt.Runner, configP
 				}
 			}
 
-			site := config.ResolveSite(siteFlag, values)
-			user, err := config.ResolveUser(userFlag, values, site)
+			site := config.ResolveSite(siteFlag.String(), values)
+			user, err := config.ResolveUser(userFlag.String(), values, site)
 			if err != nil {
 				if errors.Is(err, config.ErrMissingUser) {
 					return custom_errors.CreateInvalidInputErrorWithMessage("missing user; run go-toolkit config set-user <user>")
@@ -85,7 +86,7 @@ func NewInitCmd(commandRunner runner.Runner, promptRunner prompt.Runner, configP
 				return err
 			}
 
-			allowCustomSite := allowFull || (siteFlag == "" && values.Site != "") || (!config.IsKnownSite(site) && site != "")
+			allowCustomSite := allowFull || (siteFlag.String() == "" && values.Site != "") || (!config.IsKnownSite(site) && site != "")
 			if err := cmdutil.ValidateSite(site, allowCustomSite); err != nil {
 				return err
 			}
@@ -153,8 +154,8 @@ func NewInitCmd(commandRunner runner.Runner, promptRunner prompt.Runner, configP
 		},
 	}
 
-	cmd.Flags().StringVar(&userFlag, "user", "", "override the configured user")
-	cmd.Flags().StringVar(&siteFlag, "site", "", "override the configured site")
+	cmd.Flags().Var(&userFlag, "user", "override the configured user")
+	cmd.Flags().Var(&siteFlag, "site", "override the configured site")
 	cmd.Flags().BoolVar(&allowFull, "full", false, "allow a custom module site")
 	cmd.Flags().StringSliceVar(&packageFlags, "package", nil, "module paths to install after init")
 	cmd.Flags().StringSliceVar(&presetFlags, "preset", nil, "package preset names to install after init")

@@ -6,6 +6,7 @@ import (
 	"strings"
 
 	"github.com/louiss0/go-toolkit/custom_errors"
+	"github.com/louiss0/go-toolkit/custom_flags"
 	"github.com/louiss0/go-toolkit/internal/cmdutil"
 	"github.com/louiss0/go-toolkit/internal/modindex/config"
 	"github.com/louiss0/go-toolkit/internal/packagepath"
@@ -15,8 +16,8 @@ import (
 )
 
 func NewRemoveCmd(commandRunner runner.Runner, configPath *string) *cobra.Command {
-	var siteFlag string
-	var userFlag string
+	siteFlag := custom_flags.NewEmptyStringFlag("site")
+	userFlag := custom_flags.NewEmptyStringFlag("user")
 	var allowFull bool
 	var dryRun bool
 
@@ -44,8 +45,8 @@ func NewRemoveCmd(commandRunner runner.Runner, configPath *string) *cobra.Comman
 				return err
 			}
 
-			site := config.ResolveSite(siteFlag, values)
-			user, err := config.ResolveUser(userFlag, values, site)
+			site := config.ResolveSite(siteFlag.String(), values)
+			user, err := config.ResolveUser(userFlag.String(), values, site)
 			if err != nil {
 				if errors.Is(err, config.ErrMissingUser) {
 					return custom_errors.CreateInvalidInputErrorWithMessage("missing user; run go-toolkit config set-user <user>")
@@ -53,7 +54,7 @@ func NewRemoveCmd(commandRunner runner.Runner, configPath *string) *cobra.Comman
 				return err
 			}
 
-			allowCustomSite := allowFull || (siteFlag == "" && values.Site != "")
+			allowCustomSite := allowFull || (siteFlag.String() == "" && values.Site != "")
 			if err := cmdutil.ValidateSite(site, allowCustomSite); err != nil {
 				return err
 			}
@@ -87,8 +88,8 @@ func NewRemoveCmd(commandRunner runner.Runner, configPath *string) *cobra.Comman
 		},
 	}
 
-	cmd.Flags().StringVar(&userFlag, "user", "", "override the configured user")
-	cmd.Flags().StringVar(&siteFlag, "site", "", "override the configured site")
+	cmd.Flags().Var(&userFlag, "user", "override the configured user")
+	cmd.Flags().Var(&siteFlag, "site", "override the configured site")
 	cmd.Flags().BoolVar(&allowFull, "full", false, "allow a custom module site")
 	cmd.Flags().BoolVar(&dryRun, "dry-run", false, "print the go command without running it")
 	cmdutil.RegisterSiteCompletion(cmd, "site")

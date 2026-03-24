@@ -8,6 +8,7 @@ import (
 
 	"github.com/charmbracelet/huh"
 	"github.com/louiss0/go-toolkit/custom_errors"
+	"github.com/louiss0/go-toolkit/custom_flags"
 	"github.com/louiss0/go-toolkit/internal/cmdutil"
 	"github.com/louiss0/go-toolkit/internal/modindex/config"
 	"github.com/louiss0/go-toolkit/internal/prompt"
@@ -127,8 +128,8 @@ func newConfigSetAssureProvidersCmd(configPath *string) *cobra.Command {
 }
 
 func newConfigInitCmd(configPath *string, promptRunner prompt.Runner) *cobra.Command {
-	var userFlag string
-	var siteFlag string
+	userFlag := custom_flags.NewEmptyStringFlag("user")
+	siteFlag := custom_flags.NewEmptyStringFlag("site")
 	var allowFull bool
 
 	cmd := &cobra.Command{
@@ -136,7 +137,7 @@ func newConfigInitCmd(configPath *string, promptRunner prompt.Runner) *cobra.Com
 		Short: "Initialize the config file",
 		RunE: func(cmd *cobra.Command, args []string) error {
 			promptValues := configInitPrompt{}
-			if userFlag == "" && siteFlag == "" {
+			if userFlag.String() == "" && siteFlag.String() == "" {
 				inputs, err := promptConfigInitInputs(cmd, promptRunner)
 				if err != nil {
 					if errors.Is(err, huh.ErrUserAborted) {
@@ -153,14 +154,14 @@ func newConfigInitCmd(configPath *string, promptRunner prompt.Runner) *cobra.Com
 				return err
 			}
 
-			if userFlag != "" {
-				values.User = userFlag
+			if userFlag.String() != "" {
+				values.User = userFlag.String()
 			} else if promptValues.UserName != "" {
 				values.User = promptValues.UserName
 			}
 
-			if siteFlag != "" {
-				values.Site = siteFlag
+			if siteFlag.String() != "" {
+				values.Site = siteFlag.String()
 			} else if promptValues.ProviderSite != "" {
 				values.Site = promptValues.ProviderSite
 			}
@@ -182,8 +183,8 @@ func newConfigInitCmd(configPath *string, promptRunner prompt.Runner) *cobra.Com
 		},
 	}
 
-	cmd.Flags().StringVar(&userFlag, "user", "", "set the default user")
-	cmd.Flags().StringVar(&siteFlag, "site", "", "set the default site")
+	cmd.Flags().Var(&userFlag, "user", "set the default user")
+	cmd.Flags().Var(&siteFlag, "site", "set the default site")
 	cmd.Flags().BoolVar(&allowFull, "full", false, "allow a custom module site")
 	cmdutil.RegisterSiteCompletion(cmd, "site")
 
@@ -391,18 +392,18 @@ func newConfigPackagePresetCmd(configPath *string) *cobra.Command {
 }
 
 func newConfigProviderAddCmd(configPath *string) *cobra.Command {
-	var nameFlag string
-	var pathFlag string
+	nameFlag := custom_flags.NewEmptyStringFlag("name")
+	pathFlag := custom_flags.NewEmptyStringFlag("path")
 
 	cmd := &cobra.Command{
 		Use:   "add",
 		Short: "Add a provider config mapping",
 		RunE: func(cmd *cobra.Command, args []string) error {
-			name, err := validation.RequiredString(nameFlag, "provider name")
+			name, err := validation.RequiredString(nameFlag.String(), "provider name")
 			if err != nil {
 				return err
 			}
-			path, err := validation.RequiredString(pathFlag, "provider path")
+			path, err := validation.RequiredString(pathFlag.String(), "provider path")
 			if err != nil {
 				return err
 			}
@@ -428,20 +429,20 @@ func newConfigProviderAddCmd(configPath *string) *cobra.Command {
 		},
 	}
 
-	cmd.Flags().StringVar(&nameFlag, "name", "", "provider name")
-	cmd.Flags().StringVar(&pathFlag, "path", "", "path to provider config")
+	cmd.Flags().Var(&nameFlag, "name", "provider name")
+	cmd.Flags().Var(&pathFlag, "path", "path to provider config")
 
 	return cmd
 }
 
 func newConfigProviderRemoveCmd(configPath *string) *cobra.Command {
-	var nameFlag string
+	nameFlag := custom_flags.NewEmptyStringFlag("name")
 
 	cmd := &cobra.Command{
 		Use:   "remove",
 		Short: "Remove a provider config mapping",
 		RunE: func(cmd *cobra.Command, args []string) error {
-			name, err := validation.RequiredString(nameFlag, "provider name")
+			name, err := validation.RequiredString(nameFlag.String(), "provider name")
 			if err != nil {
 				return err
 			}
@@ -470,7 +471,7 @@ func newConfigProviderRemoveCmd(configPath *string) *cobra.Command {
 		},
 	}
 
-	cmd.Flags().StringVar(&nameFlag, "name", "", "provider name")
+	cmd.Flags().Var(&nameFlag, "name", "provider name")
 
 	return cmd
 }
@@ -499,14 +500,14 @@ func newConfigProviderListCmd(configPath *string) *cobra.Command {
 }
 
 func newConfigPackagePresetAddCmd(configPath *string) *cobra.Command {
-	var nameFlag string
+	nameFlag := custom_flags.NewEmptyStringFlag("name")
 	var packageFlags []string
 
 	cmd := &cobra.Command{
 		Use:   "add",
 		Short: "Add a package install preset",
 		PreRunE: func(cmd *cobra.Command, args []string) error {
-			name, err := validation.RequiredString(nameFlag, "package preset name")
+			name, err := validation.RequiredString(nameFlag.String(), "package preset name")
 			if err != nil {
 				return err
 			}
@@ -517,7 +518,10 @@ func newConfigPackagePresetAddCmd(configPath *string) *cobra.Command {
 			if err != nil {
 				return err
 			}
-			nameFlag = name
+			nameFlag = custom_flags.NewEmptyStringFlag("name")
+			if err := nameFlag.Set(name); err != nil {
+				return err
+			}
 			packageFlags = trimmedPackages
 
 			return nil
@@ -532,7 +536,7 @@ func newConfigPackagePresetAddCmd(configPath *string) *cobra.Command {
 			if values.PackagePresets == nil {
 				values.PackagePresets = map[string][]string{}
 			}
-			values.PackagePresets[nameFlag] = lo.Uniq(packageFlags)
+			values.PackagePresets[nameFlag.String()] = lo.Uniq(packageFlags)
 			if err := config.Save(*configPath, values); err != nil {
 				return err
 			}
@@ -542,24 +546,27 @@ func newConfigPackagePresetAddCmd(configPath *string) *cobra.Command {
 		},
 	}
 
-	cmd.Flags().StringVar(&nameFlag, "name", "", "preset name")
+	cmd.Flags().Var(&nameFlag, "name", "preset name")
 	cmd.Flags().StringSliceVar(&packageFlags, "package", nil, "packages included in the preset")
 
 	return cmd
 }
 
 func newConfigPackagePresetRemoveCmd(configPath *string) *cobra.Command {
-	var nameFlag string
+	nameFlag := custom_flags.NewEmptyStringFlag("name")
 
 	cmd := &cobra.Command{
 		Use:   "remove",
 		Short: "Remove a package install preset",
 		PreRunE: func(cmd *cobra.Command, args []string) error {
-			name, err := validation.RequiredString(nameFlag, "package preset name")
+			name, err := validation.RequiredString(nameFlag.String(), "package preset name")
 			if err != nil {
 				return err
 			}
-			nameFlag = name
+			nameFlag = custom_flags.NewEmptyStringFlag("name")
+			if err := nameFlag.Set(name); err != nil {
+				return err
+			}
 
 			return nil
 		},
@@ -570,11 +577,11 @@ func newConfigPackagePresetRemoveCmd(configPath *string) *cobra.Command {
 				return err
 			}
 
-			if _, ok := values.PackagePresets[nameFlag]; !ok {
+			if _, ok := values.PackagePresets[nameFlag.String()]; !ok {
 				return custom_errors.CreateInvalidInputErrorWithMessage("package preset name not found")
 			}
 
-			delete(values.PackagePresets, nameFlag)
+			delete(values.PackagePresets, nameFlag.String())
 			if err := config.Save(*configPath, values); err != nil {
 				return err
 			}
@@ -584,7 +591,7 @@ func newConfigPackagePresetRemoveCmd(configPath *string) *cobra.Command {
 		},
 	}
 
-	cmd.Flags().StringVar(&nameFlag, "name", "", "preset name")
+	cmd.Flags().Var(&nameFlag, "name", "preset name")
 
 	return cmd
 }

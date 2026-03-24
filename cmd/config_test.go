@@ -270,7 +270,8 @@ var Config = Describe("config command", func() {
 		)
 
 		assert.Error(err)
-		assert.Contains(err.Error(), "package preset name is required")
+		assert.Contains(err.Error(), "invalid argument")
+		assert.Contains(err.Error(), "The name is empty")
 	})
 
 	It("updates provider assurance", func() {
