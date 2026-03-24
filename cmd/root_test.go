@@ -11,12 +11,15 @@ var RootOptions = Describe("root options", func() {
 	assert := assert.New(GinkgoT())
 
 	It("panics when the config path is whitespace", func() {
-		assert.Panics(func() {
-			_ = cmd.NewRootCmdWithOptions(cmd.RootOptions{
-				Runner:       &testhelpers.RunnerMock{},
-				PromptRunner: testhelpers.NewPromptRunnerMock(),
-				ConfigPath:   "   ",
-			})
-		})
+		assert.PanicsWithError(
+			"Invalid Input: go scaffolding setup is invalid: config path must not contain spaces",
+			func() {
+				_ = cmd.NewRootCmdWithOptions(cmd.RootOptions{
+					Runner:       &testhelpers.RunnerMock{},
+					PromptRunner: testhelpers.NewPromptRunnerMock(),
+					ConfigPath:   "   ",
+				})
+			},
+		)
 	})
 })

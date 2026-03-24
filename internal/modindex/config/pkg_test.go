@@ -111,6 +111,21 @@ var _ = Describe("ConfigLoadSave", func() {
 		err := config.Save(path, values)
 
 		assert.Error(err)
+		assert.Contains(err.Error(), "go scaffolding config is invalid")
+		assert.Contains(err.Error(), "config user must not contain spaces")
+	})
+
+	It("rejects invalid site values on save", func() {
+		path := filepath.Join(GinkgoT().TempDir(), "config.toml")
+		values := config.Values{
+			Site: "github com",
+		}
+
+		err := config.Save(path, values)
+
+		assert.Error(err)
+		assert.Contains(err.Error(), "go scaffolding config is invalid")
+		assert.Contains(err.Error(), "config site must be in the form sitename.domain")
 	})
 
 	It("rejects empty package preset names", func() {

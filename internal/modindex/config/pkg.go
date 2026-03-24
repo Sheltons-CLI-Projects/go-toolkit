@@ -2,13 +2,13 @@ package config
 
 import (
 	"errors"
-	"fmt"
 	"os"
 	"path/filepath"
 	"slices"
 	"strings"
 
 	"github.com/kaptinlin/gozod"
+	"github.com/louiss0/go-toolkit/custom_errors"
 	"github.com/louiss0/go-toolkit/validation"
 	"github.com/samber/lo"
 	"github.com/spf13/viper"
@@ -117,7 +117,13 @@ func Save(path string, values Values) error {
 
 func validateValues(values Values) error {
 	if _, err := valuesSchema.Parse(values); err != nil {
-		return fmt.Errorf("invalid config values: %w", err)
+		return custom_errors.FromZod(err, custom_errors.ZodTheme{
+			Subject: "go scaffolding config",
+			FieldMessages: map[string]string{
+				"User": "config user must not contain spaces",
+				"Site": "config site must be in the form sitename.domain",
+			},
+		})
 	}
 	if err := validatePackagePresets(values.PackagePresets); err != nil {
 		return err

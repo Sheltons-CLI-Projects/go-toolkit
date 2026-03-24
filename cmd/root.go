@@ -29,6 +29,7 @@ import (
 	"github.com/kaptinlin/gozod"
 	"github.com/louiss0/g-tools/mode"
 	"github.com/louiss0/go-toolkit/build_info"
+	"github.com/louiss0/go-toolkit/custom_errors"
 	"github.com/louiss0/go-toolkit/internal/modindex/config"
 	"github.com/louiss0/go-toolkit/internal/prompt"
 	"github.com/louiss0/go-toolkit/internal/runner"
@@ -61,7 +62,15 @@ func NewRootCmd() *cobra.Command {
 }
 
 func NewRootCmdWithOptions(options RootOptions) *cobra.Command {
-	rootOptionsSchema.MustParse(options)
+	if _, err := rootOptionsSchema.Parse(options); err != nil {
+		panic(custom_errors.FromZod(err, custom_errors.ZodTheme{
+			Subject:     "go scaffolding setup",
+			RootMessage: "command wiring requires a runner and prompt runner",
+			FieldMessages: map[string]string{
+				"ConfigPath": "config path must not contain spaces",
+			},
+		}))
+	}
 
 	commandRunner := options.Runner
 	promptRunner := options.PromptRunner
