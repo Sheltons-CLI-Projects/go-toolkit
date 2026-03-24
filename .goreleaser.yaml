@@ -63,13 +63,10 @@ winget:
     repository:
       owner: louiss0
       name: winget-pkgs
-      branch: "go-toolkit-{{ .Version }}"
-      pull_request:
-        enabled: true
-        base:
-          owner: microsoft
-          name: winget-pkgs
-          branch: master
+      branch: main
+      git:
+        url: "git@github.com:louiss0/winget-pkgs.git"
+        private_key: "{{ .Env.GORELEASER_DEPLOY_KEY }}"
 
 homebrew_casks:
   - name: go-toolkit
@@ -82,6 +79,9 @@ homebrew_casks:
       owner: louiss0
       name: homebrew-the-code-fixer-23
       branch: main
+      git:
+        url: "git@github.com:louiss0/homebrew-the-code-fixer-23.git"
+        private_key: "{{ .Env.GORELEASER_DEPLOY_KEY }}"
 
 nix:
   - name: go-toolkit
@@ -94,3 +94,6 @@ nix:
       owner: louiss0
       name: the-code-fixer-23-nur
       branch: main
+      git:
+        url: "git@github.com:louiss0/the-code-fixer-23-nur.git"
+        private_key: "{{ .Env.GORELEASER_DEPLOY_KEY }}"
