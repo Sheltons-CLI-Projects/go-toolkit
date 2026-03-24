@@ -142,7 +142,7 @@ var Config = Describe("config command", func() {
 		var payload map[string]any
 		err = json.Unmarshal([]byte(output), &payload)
 		assert.NoError(err)
-		assert.Equal(configPath, payload["path"])
+		assert.Equal(testhelpers.CanonicalPath(configPath), testhelpers.CanonicalPath(payload["path"].(string)))
 	})
 
 	It("adds a provider mapping", func() {

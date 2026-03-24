@@ -11,6 +11,10 @@ import (
 	"github.com/stretchr/testify/mock"
 )
 
+func writeDefaultConfig(path string) error {
+	return os.WriteFile(path, []byte("user = \"lou\"\nsite = \"github.com\"\n"), 0o644)
+}
+
 var Add = Describe("add command", func() {
 	assert := assert.New(GinkgoT())
 
@@ -43,14 +47,21 @@ var Add = Describe("add command", func() {
 
 	It("adds a module path with a version suffix", func() {
 		runner := &testhelpers.RunnerMock{}
+		tempDir := GinkgoT().TempDir()
+		configPath := filepath.Join(tempDir, "config.toml")
+
+		err := writeDefaultConfig(configPath)
+		assert.NoError(err)
+
 		runner.On("Run", mock.Anything, "go", []string{"get", "github.com/onsi/ginkgo/v2"}).Return(nil).Once()
 
 		rootCmd := cmd.NewRootCmdWithOptions(cmd.RootOptions{
 			Runner:       runner,
 			PromptRunner: testhelpers.NewPromptRunnerMock(),
+			ConfigPath:   configPath,
 		})
 
-		_, err := testhelpers.ExecuteCmd(rootCmd, "add", "github.com/onsi/ginkgo/v2")
+		_, err = testhelpers.ExecuteCmd(rootCmd, "add", "github.com/onsi/ginkgo/v2")
 
 		assert.NoError(err)
 		runner.AssertExpectations(GinkgoT())
@@ -58,14 +69,21 @@ var Add = Describe("add command", func() {
 
 	It("adds a module with an @version suffix", func() {
 		runner := &testhelpers.RunnerMock{}
+		tempDir := GinkgoT().TempDir()
+		configPath := filepath.Join(tempDir, "config.toml")
+
+		err := writeDefaultConfig(configPath)
+		assert.NoError(err)
+
 		runner.On("Run", mock.Anything, "go", []string{"get", "github.com/onsi/ginkgo@v2.0.0"}).Return(nil).Once()
 
 		rootCmd := cmd.NewRootCmdWithOptions(cmd.RootOptions{
 			Runner:       runner,
 			PromptRunner: testhelpers.NewPromptRunnerMock(),
+			ConfigPath:   configPath,
 		})
 
-		_, err := testhelpers.ExecuteCmd(rootCmd, "add", "github.com/onsi/ginkgo@v2.0.0")
+		_, err = testhelpers.ExecuteCmd(rootCmd, "add", "github.com/onsi/ginkgo@v2.0.0")
 
 		assert.NoError(err)
 		runner.AssertExpectations(GinkgoT())
@@ -87,7 +105,7 @@ var Add = Describe("add command", func() {
 		tempDir := GinkgoT().TempDir()
 		configPath := filepath.Join(tempDir, "config.toml")
 
-		err := os.WriteFile(configPath, []byte("user = \"lou\"\nsite = \"github.com\"\n"), 0o644)
+		err := writeDefaultConfig(configPath)
 		assert.NoError(err)
 
 		rootCmd := cmd.NewRootCmdWithOptions(cmd.RootOptions{
@@ -108,7 +126,7 @@ var Add = Describe("add command", func() {
 		tempDir := GinkgoT().TempDir()
 		configPath := filepath.Join(tempDir, "config.toml")
 
-		err := os.WriteFile(configPath, []byte("user = \"lou\"\nsite = \"github.com\"\n"), 0o644)
+		err := writeDefaultConfig(configPath)
 		assert.NoError(err)
 
 		promptRunner := testhelpers.NewPromptRunnerMock(
@@ -139,7 +157,7 @@ var Add = Describe("add command", func() {
 		tempDir := GinkgoT().TempDir()
 		configPath := filepath.Join(tempDir, "config.toml")
 
-		err := os.WriteFile(configPath, []byte("user = \"lou\"\nsite = \"github.com\"\n"), 0o644)
+		err := writeDefaultConfig(configPath)
 		assert.NoError(err)
 
 		promptRunner := testhelpers.NewPromptRunnerMock(

@@ -6,6 +6,7 @@ import (
 	"path/filepath"
 
 	"github.com/louiss0/go-toolkit/internal/modindex/config"
+	"github.com/louiss0/go-toolkit/internal/testhelpers"
 	. "github.com/onsi/ginkgo/v2"
 	"github.com/stretchr/testify/assert"
 )
@@ -39,7 +40,7 @@ var _ = Describe("ResolveConfigPath", func() {
 
 		resolved := config.ResolveConfigPath("")
 
-		assert.Equal(localPath, resolved)
+		assert.Equal(testhelpers.CanonicalPath(localPath), testhelpers.CanonicalPath(resolved))
 	})
 
 	It("falls back to the default config location", func() {

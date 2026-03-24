@@ -16,14 +16,21 @@ var Remove = Describe("remove command", func() {
 
 	It("removes a fully qualified module", func() {
 		runner := &testhelpers.RunnerMock{}
+		tempDir := GinkgoT().TempDir()
+		configPath := filepath.Join(tempDir, "config.toml")
+
+		err := writeDefaultConfig(configPath)
+		assert.NoError(err)
+
 		runner.On("Run", mock.Anything, "go", []string{"get", "github.com/acme/tool@none"}).Return(nil).Once()
 
 		rootCmd := cmd.NewRootCmdWithOptions(cmd.RootOptions{
 			Runner:       runner,
 			PromptRunner: testhelpers.NewPromptRunnerMock(),
+			ConfigPath:   configPath,
 		})
 
-		_, err := testhelpers.ExecuteCmd(rootCmd, "remove", "github.com/acme/tool")
+		_, err = testhelpers.ExecuteCmd(rootCmd, "remove", "github.com/acme/tool")
 
 		assert.NoError(err)
 		runner.AssertExpectations(GinkgoT())
@@ -58,14 +65,21 @@ var Remove = Describe("remove command", func() {
 
 	It("removes a module path with a version suffix", func() {
 		runner := &testhelpers.RunnerMock{}
+		tempDir := GinkgoT().TempDir()
+		configPath := filepath.Join(tempDir, "config.toml")
+
+		err := writeDefaultConfig(configPath)
+		assert.NoError(err)
+
 		runner.On("Run", mock.Anything, "go", []string{"get", "github.com/onsi/ginkgo/v2@none"}).Return(nil).Once()
 
 		rootCmd := cmd.NewRootCmdWithOptions(cmd.RootOptions{
 			Runner:       runner,
 			PromptRunner: testhelpers.NewPromptRunnerMock(),
+			ConfigPath:   configPath,
 		})
 
-		_, err := testhelpers.ExecuteCmd(rootCmd, "remove", "github.com/onsi/ginkgo/v2")
+		_, err = testhelpers.ExecuteCmd(rootCmd, "remove", "github.com/onsi/ginkgo/v2")
 
 		assert.NoError(err)
 		runner.AssertExpectations(GinkgoT())
@@ -84,10 +98,16 @@ var Remove = Describe("remove command", func() {
 
 	It("prints the remove command on dry run", func() {
 		runner := &testhelpers.RunnerMock{}
+		tempDir := GinkgoT().TempDir()
+		configPath := filepath.Join(tempDir, "config.toml")
+
+		err := writeDefaultConfig(configPath)
+		assert.NoError(err)
 
 		rootCmd := cmd.NewRootCmdWithOptions(cmd.RootOptions{
 			Runner:       runner,
 			PromptRunner: testhelpers.NewPromptRunnerMock(),
+			ConfigPath:   configPath,
 		})
 
 		output, err := testhelpers.ExecuteCmd(rootCmd, "remove", "github.com/onsi/ginkgo/v2", "--dry-run")

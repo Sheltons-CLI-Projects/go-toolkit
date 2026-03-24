@@ -3,12 +3,22 @@ package testhelpers
 import (
 	"bytes"
 	"fmt"
+	"path/filepath"
 
 	"github.com/louiss0/go-toolkit/internal/prompt"
 	"github.com/samber/lo"
 	"github.com/spf13/cobra"
 	"github.com/stretchr/testify/mock"
 )
+
+func CanonicalPath(path string) string {
+	resolvedPath, err := filepath.EvalSymlinks(path)
+	if err == nil {
+		return resolvedPath
+	}
+
+	return filepath.Clean(path)
+}
 
 type RunnerMock struct {
 	mock.Mock
