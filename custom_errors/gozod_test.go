@@ -29,7 +29,7 @@ var _ = Describe("FromZod", func() {
 		})
 
 		assert.Error(err)
-		assert.ErrorIs(themed, custom_errors.InvalidInput)
+		assert.ErrorIs(themed, custom_errors.ErrInvalidInput)
 		assert.Contains(themed.Error(), "go scaffolding setup is invalid")
 		assert.Contains(themed.Error(), "config path must not contain spaces")
 	})

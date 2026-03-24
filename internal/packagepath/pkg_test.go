@@ -92,7 +92,7 @@ var _ = Describe("Packagepath", func() {
 				"githubcom",
 				"lou",
 				"",
-				custom_errors.InvalidInput,
+				custom_errors.ErrInvalidInput,
 			),
 			Entry(
 				"errors on invalid path structures",
@@ -100,7 +100,7 @@ var _ = Describe("Packagepath", func() {
 				"github.com",
 				"lou",
 				"",
-				custom_errors.InvalidInput,
+				custom_errors.ErrInvalidInput,
 			),
 		)
 	})

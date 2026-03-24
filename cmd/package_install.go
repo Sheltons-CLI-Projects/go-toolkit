@@ -15,25 +15,6 @@ import (
 	"github.com/spf13/cobra"
 )
 
-func parsePackageList(value string) []string {
-	parts := strings.FieldsFunc(value, func(r rune) bool {
-		return r == ',' || r == '\n' || r == '\r' || r == '\t' || r == ' '
-	})
-
-	packages := lo.FilterMap(parts, func(part string, _ int) (string, bool) {
-		trimmed := strings.TrimSpace(part)
-		if trimmed == "" {
-			return "", false
-		}
-		return trimmed, true
-	})
-	if len(packages) == 0 {
-		return nil
-	}
-
-	return packages
-}
-
 func resolveInstallPackages(values config.Values, packageFlags []string, presetFlags []string, promptPackages []string) ([]string, error) {
 	presetPackages, err := config.ResolvePackagePresetPackages(values, presetFlags)
 	if err != nil {
