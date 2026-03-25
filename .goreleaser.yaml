@@ -33,7 +33,7 @@ checksum:
 
 release:
   github:
-    owner: Sheltons-CLI-Projects
+    owner: louiss0
     name: go-toolkit
 
 winget:
@@ -41,18 +41,18 @@ winget:
     publisher: Shelton Louis
     short_description: "CLI for Go scaffolding and module maintenance."
     description: "Scaffold Go projects, add or remove module dependencies, manage providers, and reuse package presets from the command line."
-    homepage: "https://github.com/Sheltons-CLI-Projects/go-toolkit"
+    homepage: "https://github.com/louiss0/go-toolkit"
     license: MIT
-    license_url: "https://github.com/Sheltons-CLI-Projects/go-toolkit/blob/main/LICENSE"
+    license_url: "https://github.com/louiss0/go-toolkit/blob/main/LICENSE"
     copyright: "Copyright (c) 2025 Shelton Louis"
-    publisher_url: "https://github.com/Sheltons-CLI-Projects"
-    publisher_support_url: "https://github.com/Sheltons-CLI-Projects/go-toolkit/issues/new"
+    publisher_url: "https://github.com/louiss0"
+    publisher_support_url: "https://github.com/louiss0/go-toolkit/issues/new"
     package_identifier: the-code-fixer-23.go-toolkit
     package_name: "go-toolkit"
     path: manifests/t/the-code-fixer-23/go-toolkit/{{ .Version }}
     commit_msg_template: "{{ .PackageIdentifier }}: {{ .Tag }}"
     release_notes: "{{.Changelog}}"
-    release_notes_url: "https://github.com/Sheltons-CLI-Projects/go-toolkit/releases/tag/{{ .Tag }}"
+    release_notes_url: "https://github.com/louiss0/go-toolkit/releases/tag/{{ .Tag }}"
     installation_notes: "Installs the `gtk` executable."
     tags:
       - go
@@ -73,7 +73,7 @@ homebrew_casks:
     binaries:
       - gtk
     commit_msg_template: "Brew cask update for {{ .ProjectName }} version {{ .Tag }}"
-    homepage: "https://github.com/Sheltons-CLI-Projects/go-toolkit"
+    homepage: "https://github.com/louiss0/go-toolkit"
     description: "CLI for Go scaffolding and dependency workflows."
     repository:
       owner: Sheltons-CLI-Projects
@@ -87,7 +87,7 @@ nix:
   - name: go-toolkit
     commit_msg_template: "{{ .ProjectName }}: {{ .Tag }}"
     path: "pkgs/{{ .ProjectName }}/default.nix"
-    homepage: "https://github.com/Sheltons-CLI-Projects/go-toolkit"
+    homepage: "https://github.com/louiss0/go-toolkit"
     description: "CLI for scaffolding Go projects and managing module dependencies."
     license: mit
     repository:
