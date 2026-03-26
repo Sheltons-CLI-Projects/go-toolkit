@@ -31,6 +31,7 @@ func NewConfigCmd(configPath *string, promptRunner prompt.Runner) *cobra.Command
 	cmd.AddCommand(newConfigSetScaffoldTestsCmd(configPath))
 	cmd.AddCommand(newConfigProviderCmd(configPath))
 	cmd.AddCommand(newConfigPackagePresetCmd(configPath))
+	cmd.AddCommand(newConfigGlobalPackageCmd(configPath))
 	cmd.AddCommand(newConfigRemoveCmd(configPath))
 
 	return cmd
@@ -201,6 +202,7 @@ type configSummary struct {
 	Scaffold        config.ScaffoldConfig   `json:"scaffold"`
 	Providers       []config.ProviderConfig `json:"providers"`
 	PackagePresets  map[string][]string     `json:"package_presets"`
+	GlobalPackages  []string                `json:"global_packages"`
 }
 
 func promptConfigInitInputs(cmd *cobra.Command, runner prompt.Runner) (configInitPrompt, error) {
@@ -294,6 +296,10 @@ func buildConfigSummary(configPath string, values config.Values) (configSummary,
 	if packagePresets == nil {
 		packagePresets = map[string][]string{}
 	}
+	globalPackages := values.GlobalPackages
+	if globalPackages == nil {
+		globalPackages = []string{}
+	}
 
 	return configSummary{
 		Path:            configPath,
@@ -303,6 +309,7 @@ func buildConfigSummary(configPath string, values config.Values) (configSummary,
 		Scaffold:        values.Scaffold,
 		Providers:       providers,
 		PackagePresets:  packagePresets,
+		GlobalPackages:  globalPackages,
 	}, nil
 }
 
@@ -604,6 +611,129 @@ func newConfigPackagePresetListCmd(configPath *string) *cobra.Command {
 			})
 			if len(rows) > 0 {
 				return cmdutil.WriteLine(cmd.OutOrStdout(), strings.Join(rows, "\n"))
+			}
+
+			return nil
+		},
+	}
+}
+
+func newConfigGlobalPackageCmd(configPath *string) *cobra.Command {
+	cmd := &cobra.Command{
+		Use:   "global-package",
+		Short: "Manage saved global packages",
+	}
+
+	cmd.AddCommand(newConfigGlobalPackageAddCmd(configPath))
+	cmd.AddCommand(newConfigGlobalPackageListCmd(configPath))
+	cmd.AddCommand(newConfigGlobalPackageRemoveCmd(configPath))
+
+	return cmd
+}
+
+func newConfigGlobalPackageAddCmd(configPath *string) *cobra.Command {
+	var packageFlags []string
+
+	cmd := &cobra.Command{
+		Use:   "add",
+		Short: "Add packages to the saved global package list",
+		PreRunE: func(cmd *cobra.Command, args []string) error {
+			if len(packageFlags) == 0 {
+				return custom_errors.CreateInvalidInputErrorWithMessage("at least one package is required")
+			}
+			trimmedPackages, err := validation.NonEmptyStrings(packageFlags, "package values")
+			if err != nil {
+				return err
+			}
+			packageFlags = trimmedPackages
+
+			return nil
+		},
+		RunE: func(cmd *cobra.Command, args []string) error {
+			cmdutil.LogInfoIfProduction("config global-package add: loading config")
+			values, err := config.Load(*configPath)
+			if err != nil {
+				return err
+			}
+
+			values.GlobalPackages = lo.Uniq(append(values.GlobalPackages, packageFlags...))
+			if err := config.Save(*configPath, values); err != nil {
+				return err
+			}
+
+			return cmdutil.WriteLine(cmd.OutOrStdout(), "global packages saved")
+		},
+	}
+
+	cmd.Flags().StringSliceVar(&packageFlags, "package", nil, "full module paths to add")
+
+	return cmd
+}
+
+func newConfigGlobalPackageRemoveCmd(configPath *string) *cobra.Command {
+	var packageFlags []string
+
+	cmd := &cobra.Command{
+		Use:   "remove",
+		Short: "Remove packages from the saved global package list",
+		PreRunE: func(cmd *cobra.Command, args []string) error {
+			if len(packageFlags) == 0 {
+				return custom_errors.CreateInvalidInputErrorWithMessage("at least one package is required")
+			}
+			trimmedPackages, err := validation.NonEmptyStrings(packageFlags, "package values")
+			if err != nil {
+				return err
+			}
+			packageFlags = trimmedPackages
+
+			return nil
+		},
+		RunE: func(cmd *cobra.Command, args []string) error {
+			cmdutil.LogInfoIfProduction("config global-package remove: loading config")
+			values, err := config.Load(*configPath)
+			if err != nil {
+				return err
+			}
+
+			removeSet := lo.SliceToMap(packageFlags, func(pkg string) (string, struct{}) {
+				return pkg, struct{}{}
+			})
+			filtered := lo.Filter(values.GlobalPackages, func(pkg string, _ int) bool {
+				_, found := removeSet[pkg]
+				return !found
+			})
+
+			if len(filtered) == len(values.GlobalPackages) {
+				return custom_errors.CreateInvalidInputErrorWithMessage("no matching global packages found")
+			}
+
+			values.GlobalPackages = filtered
+			if err := config.Save(*configPath, values); err != nil {
+				return err
+			}
+
+			return cmdutil.WriteLine(cmd.OutOrStdout(), "global packages updated")
+		},
+	}
+
+	cmd.Flags().StringSliceVar(&packageFlags, "package", nil, "full module paths to remove")
+
+	return cmd
+}
+
+func newConfigGlobalPackageListCmd(configPath *string) *cobra.Command {
+	return &cobra.Command{
+		Use:   "list",
+		Short: "List saved global packages",
+		RunE: func(cmd *cobra.Command, args []string) error {
+			cmdutil.LogInfoIfProduction("config global-package list: loading config")
+			values, err := config.Load(*configPath)
+			if err != nil {
+				return err
+			}
+
+			if len(values.GlobalPackages) > 0 {
+				return cmdutil.WriteLine(cmd.OutOrStdout(), strings.Join(values.GlobalPackages, "\n"))
 			}
 
 			return nil
