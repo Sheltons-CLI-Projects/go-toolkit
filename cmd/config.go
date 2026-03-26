@@ -645,6 +645,13 @@ func newConfigGlobalPackageAddCmd(configPath *string) *cobra.Command {
 			if err != nil {
 				return err
 			}
+			if lo.ContainsBy(trimmedPackages, func(pkg string) bool {
+				return !validation.IsFullModulePath(pkg)
+			}) {
+				return custom_errors.CreateInvalidInputErrorWithMessage(
+					"package values must be full module paths (for example: github.com/user/module)",
+				)
+			}
 			packageFlags = trimmedPackages
 
 			return nil

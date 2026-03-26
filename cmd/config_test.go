@@ -292,4 +292,54 @@ var Config = Describe("config command", func() {
 		assert.NoError(err)
 		assert.True(values.AssureProviders)
 	})
+
+	It("adds global packages when full module paths are provided", func() {
+		runner := &testhelpers.RunnerMock{}
+		tempDir := GinkgoT().TempDir()
+		configPath := filepath.Join(tempDir, "config.toml")
+
+		rootCmd := cmd.NewRootCmdWithOptions(cmd.RootOptions{
+			Runner:       runner,
+			PromptRunner: testhelpers.NewPromptRunnerMock(),
+			ConfigPath:   configPath,
+		})
+
+		_, err := testhelpers.ExecuteCmd(
+			rootCmd,
+			"config",
+			"global-package",
+			"add",
+			"--package",
+			"github.com/samber/lo",
+		)
+
+		assert.NoError(err)
+		values, err := config.Load(configPath)
+		assert.NoError(err)
+		assert.Equal([]string{"github.com/samber/lo"}, values.GlobalPackages)
+	})
+
+	It("rejects non-full paths for config global-package add", func() {
+		runner := &testhelpers.RunnerMock{}
+		tempDir := GinkgoT().TempDir()
+		configPath := filepath.Join(tempDir, "config.toml")
+
+		rootCmd := cmd.NewRootCmdWithOptions(cmd.RootOptions{
+			Runner:       runner,
+			PromptRunner: testhelpers.NewPromptRunnerMock(),
+			ConfigPath:   configPath,
+		})
+
+		_, err := testhelpers.ExecuteCmd(
+			rootCmd,
+			"config",
+			"global-package",
+			"add",
+			"--package",
+			"samber/lo",
+		)
+
+		assert.Error(err)
+		assert.Contains(err.Error(), "full module paths")
+	})
 })

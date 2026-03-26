@@ -150,4 +150,46 @@ var Install = Describe("install command", func() {
 		assert.Error(err)
 		assert.Contains(err.Error(), "@none is not valid")
 	})
+
+	It("rejects @none in --package values", func() {
+		runner := &testhelpers.RunnerMock{}
+		tempDir := GinkgoT().TempDir()
+		configPath := filepath.Join(tempDir, "config.toml")
+
+		err := writeDefaultConfig(configPath)
+		assert.NoError(err)
+
+		rootCmd := cmd.NewRootCmdWithOptions(cmd.RootOptions{
+			Runner:       runner,
+			PromptRunner: testhelpers.NewPromptRunnerMock(),
+			ConfigPath:   configPath,
+		})
+
+		_, err = testhelpers.ExecuteCmd(rootCmd, "install", "--package", "github.com/onsi/ginkgo/v2@none")
+
+		assert.Error(err)
+		assert.Contains(err.Error(), "@none is not valid")
+		runner.AssertNotCalled(GinkgoT(), "Run", mock.Anything, mock.Anything, mock.Anything)
+	})
+
+	It("rejects @none in preset package values", func() {
+		runner := &testhelpers.RunnerMock{}
+		tempDir := GinkgoT().TempDir()
+		configPath := filepath.Join(tempDir, "config.toml")
+
+		err := os.WriteFile(configPath, []byte("user = \"lou\"\nsite = \"github.com\"\n[package_presets]\ncli = [\"github.com/onsi/ginkgo/v2@none\"]\n"), 0o644)
+		assert.NoError(err)
+
+		rootCmd := cmd.NewRootCmdWithOptions(cmd.RootOptions{
+			Runner:       runner,
+			PromptRunner: testhelpers.NewPromptRunnerMock(),
+			ConfigPath:   configPath,
+		})
+
+		_, err = testhelpers.ExecuteCmd(rootCmd, "install", "--preset", "cli")
+
+		assert.Error(err)
+		assert.Contains(err.Error(), "@none is not valid")
+		runner.AssertNotCalled(GinkgoT(), "Run", mock.Anything, mock.Anything, mock.Anything)
+	})
 })

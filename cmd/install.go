@@ -28,14 +28,7 @@ func NewInstallCmd(commandRunner runner.Runner, promptRunner prompt.Runner, conf
 		Use:   "install [package] [packages...]",
 		Short: "Install Go binaries globally and save them to the global package list",
 		Args: func(cmd *cobra.Command, args []string) error {
-			containsNoneTag := lo.ContainsBy(args, func(input string) bool {
-				return strings.Contains(input, "@none")
-			})
-			if containsNoneTag {
-				return custom_errors.CreateInvalidInputErrorWithMessage("@none is not valid for install")
-			}
-
-			return nil
+			return validateInstallInputs(args)
 		},
 		RunE: func(cmd *cobra.Command, args []string) error {
 			values, err := config.Load(*configPath)
@@ -62,6 +55,9 @@ func NewInstallCmd(commandRunner runner.Runner, promptRunner prompt.Runner, conf
 			targetPackages = append(targetPackages, installPackages...)
 			if len(targetPackages) == 0 {
 				return custom_errors.CreateInvalidInputErrorWithMessage("at least one package or preset is required")
+			}
+			if err := validateInstallInputs(targetPackages); err != nil {
+				return err
 			}
 
 			site := config.ResolveSite(siteFlag.String(), values)
@@ -152,4 +148,15 @@ func promptInstallPackages(cmd *cobra.Command, runner prompt.Runner) ([]string, 
 	}
 
 	return validation.RequiredShortPackageList(packageInput, "packages to install")
+}
+
+func validateInstallInputs(inputs []string) error {
+	containsNoneTag := lo.ContainsBy(inputs, func(input string) bool {
+		return strings.Contains(input, "@none")
+	})
+	if containsNoneTag {
+		return custom_errors.CreateInvalidInputErrorWithMessage("@none is not valid for install")
+	}
+
+	return nil
 }
