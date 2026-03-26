@@ -136,3 +136,19 @@ func IsShortPackagePath(value string) bool {
 		return part != "" && !strings.ContainsAny(part, ", \t\r\n")
 	})
 }
+
+func IsFullModulePath(value string) bool {
+	trimmed := strings.TrimSpace(value)
+	parts := strings.Split(trimmed, "/")
+	if len(parts) < 2 {
+		return false
+	}
+
+	if !strings.Contains(parts[0], ".") {
+		return false
+	}
+
+	return lo.EveryBy(parts, func(part string) bool {
+		return part != "" && !strings.ContainsAny(part, ", \t\r\n")
+	})
+}

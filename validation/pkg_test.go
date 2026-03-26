@@ -86,3 +86,14 @@ var _ = Describe("RequiredShortPackageList", func() {
 		assert.Contains(err.Error(), "packages to add must use space-separated username/package entries")
 	})
 })
+
+var _ = Describe("IsFullModulePath", func() {
+	It("accepts fully-qualified module paths", func() {
+		assert.True(validation.IsFullModulePath("github.com/samber/lo"))
+		assert.True(validation.IsFullModulePath("rsc.io/quote"))
+	})
+
+	It("rejects short package paths", func() {
+		assert.False(validation.IsFullModulePath("samber/lo"))
+	})
+})

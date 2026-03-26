@@ -96,8 +96,10 @@ It shortens common tasks like init, remove, and scaffold.`,
 	testCmd := NewTestCmd(commandRunner)
 	configCmd := NewConfigCmd(&configPath, promptRunner)
 	searchCmd := NewSearchCmd()
+	installCmd := NewInstallCmd(commandRunner, promptRunner, &configPath)
+	installGlobalsCmd := NewInstallGlobalsCmd(commandRunner, &configPath)
 
-	cmd.AddCommand(initCmd, addCmd, removeCmd, scaffoldCmd, testCmd, configCmd, searchCmd)
+	cmd.AddCommand(initCmd, addCmd, removeCmd, scaffoldCmd, testCmd, configCmd, searchCmd, installCmd, installGlobalsCmd)
 
 	configureCompletions(cmd, scaffoldCmd, configCmd)
 

@@ -31,6 +31,7 @@ type Values struct {
 	Scaffold        ScaffoldConfig      `mapstructure:"scaffold" toml:"scaffold"`
 	Providers       []ProviderConfig    `mapstructure:"providers" toml:"providers"`
 	PackagePresets  map[string][]string `mapstructure:"package_presets" toml:"package_presets"`
+	GlobalPackages  []string            `mapstructure:"global_packages" toml:"global_packages"`
 }
 
 type ProviderConfig struct {
@@ -110,6 +111,9 @@ func Save(path string, values Values) error {
 	}
 	if len(values.PackagePresets) > 0 {
 		configFile.Set("package_presets", values.PackagePresets)
+	}
+	if len(values.GlobalPackages) > 0 {
+		configFile.Set("global_packages", values.GlobalPackages)
 	}
 
 	return configFile.WriteConfigAs(path)
