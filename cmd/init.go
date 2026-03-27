@@ -32,131 +32,41 @@ func NewInitCmd(commandRunner runner.Runner, promptRunner prompt.Runner, configP
 		Short: "Initialize a Go module with a short package name",
 		Args:  cobra.MaximumNArgs(1),
 		RunE: func(cmd *cobra.Command, args []string) error {
-			promptValues := initPrompt{}
-			moduleInput := ""
-
-			if len(args) == 0 {
-				cmdutil.LogInfoIfProduction("init: starting interactive prompt")
-				inputs, err := promptInitInputs(cmd, promptRunner)
-				if err != nil {
-					if errors.Is(err, huh.ErrUserAborted) {
-						return nil
-					}
-					return err
-				}
-				promptValues = inputs
-				moduleInput = inputs.ModuleName
-			} else {
-				moduleInput = args[0]
-			}
-
-			if _, err := validation.RequiredString(moduleInput, "module name"); err != nil {
-				return err
-			}
-
-			cmdutil.LogInfoIfProduction("init: loading config")
-			values, err := config.Load(*configPath)
-			if err != nil {
-				return err
-			}
-
-			configChanged := false
-			if promptValues.UserName != "" {
-				values.User = promptValues.UserName
-				configChanged = true
-			}
-			if promptValues.ProviderSite != "" {
-				values.Site = promptValues.ProviderSite
-				configChanged = true
-			}
-			if promptValues.ShouldPersistTestChoice() {
-				values.Scaffold.WriteTests = promptValues.TestDrivenChoice == testChoiceYes
-				configChanged = true
-			}
-			if promptValues.ShouldPersistGitChoice() {
-				initGit := promptValues.GitChoice == gitChoiceYes
-				values.Scaffold.InitGit = &initGit
-				configChanged = true
-			}
-			if configChanged {
-				if err := config.Save(*configPath, values); err != nil {
-					return err
-				}
-			}
-
-			site := config.ResolveSite(siteFlag.String(), values)
-			user, err := config.ResolveUser(userFlag.String(), values, site)
-			if err != nil {
-				if errors.Is(err, config.ErrMissingUser) {
-					return custom_errors.CreateInvalidInputErrorWithMessage("missing user; run go-toolkit config set-user <user>")
-				}
-				return err
-			}
-
-			allowCustomSite := allowFull || (siteFlag.String() == "" && values.Site != "") || (!config.IsKnownSite(site) && site != "")
-			if err := cmdutil.ValidateSite(site, allowCustomSite); err != nil {
-				return err
-			}
-
-			installPackages, err := resolveInstallPackages(values, packageFlags, presetFlags, promptValues.Packages)
-			if err != nil {
-				return err
-			}
-			installPackages, err = assurePackageProviders(cmd, promptRunner, values, site, installPackages)
+			promptValues, moduleInput, err := collectInitInput(cmd, args, promptRunner)
 			if err != nil {
 				if errors.Is(err, huh.ErrUserAborted) {
 					return nil
 				}
 				return err
 			}
-			installPackages, err = resolveModulePaths(installPackages, site, user)
+
+			values, err := loadAndPersistInitConfig(*configPath, promptValues)
 			if err != nil {
 				return err
 			}
 
-			cmdutil.LogInfoIfProduction("init: resolving module path for %s", site)
-			modulePath, err := packagepath.ResolveModulePath(moduleInput, site, user)
+			site, user, err := resolveInitSiteAndUser(siteFlag.String(), userFlag.String(), allowFull, values)
 			if err != nil {
 				return err
 			}
 
-			cmdutil.LogInfoIfProduction("init: running go mod init")
-			if err := commandRunner.Run(cmd, "go", "mod", "init", modulePath); err != nil {
-				return err
-			}
-
-			if len(installPackages) > 0 {
-				cmdutil.LogInfoIfProduction("init: installing packages")
-				args := append([]string{"get"}, installPackages...)
-				if err := commandRunner.Run(cmd, "go", args...); err != nil {
-					return err
+			installPackages, err := resolveInitPackages(cmd, promptRunner, values, site, user, packageFlags, presetFlags, promptValues.Packages)
+			if err != nil {
+				if errors.Is(err, huh.ErrUserAborted) {
+					return nil
 				}
+				return err
+			}
+
+			modulePath, err := initModule(cmd, commandRunner, moduleInput, site, user, installPackages)
+			if err != nil {
+				return err
 			}
 
 			template := resolveInitTemplate(templateFlag.String(), promptValues)
 			shouldInitGit := resolveInitGit(gitFlag.String(), gitFlag.Value(), values, promptValues)
-
-			cmdutil.LogInfoIfProduction("init: creating project layout from %s template", template)
-			if err := project.EnsureLayout(".", project.Options{
-				Template:       template,
-				WriteGitIgnore: shouldInitGit,
-			}); err != nil {
+			if err := applyInitLayout(cmd, commandRunner, template, shouldInitGit); err != nil {
 				return err
-			}
-
-			if shouldInitGit {
-				if _, err := os.Stat(".git"); err == nil {
-					cmdutil.LogInfoIfProduction("init: git already initialized")
-				} else if !errors.Is(err, os.ErrNotExist) {
-					return err
-				} else {
-					cmdutil.LogInfoIfProduction("init: running git init")
-					if err := commandRunner.Run(cmd, "git", "init"); err != nil {
-						return err
-					}
-				}
-			} else {
-				cmdutil.LogInfoIfProduction("init: git init skipped")
 			}
 
 			promptValues.Packages = installPackages
@@ -178,6 +88,156 @@ func NewInitCmd(commandRunner runner.Runner, promptRunner prompt.Runner, configP
 	})
 
 	return cmd
+}
+
+func collectInitInput(cmd *cobra.Command, args []string, promptRunner prompt.Runner) (initPrompt, string, error) {
+	if len(args) > 0 {
+		moduleInput, err := validation.RequiredString(args[0], "module name")
+		if err != nil {
+			return initPrompt{}, "", err
+		}
+
+		return initPrompt{}, moduleInput, nil
+	}
+
+	cmdutil.LogInfoIfProduction("init: starting interactive prompt")
+	inputs, err := promptInitInputs(cmd, promptRunner)
+	if err != nil {
+		return initPrompt{}, "", err
+	}
+
+	moduleInput, err := validation.RequiredString(inputs.ModuleName, "module name")
+	if err != nil {
+		return initPrompt{}, "", err
+	}
+
+	return inputs, moduleInput, nil
+}
+
+func loadAndPersistInitConfig(configPath string, promptValues initPrompt) (config.Values, error) {
+	cmdutil.LogInfoIfProduction("init: loading config")
+	values, err := config.Load(configPath)
+	if err != nil {
+		return config.Values{}, err
+	}
+
+	if !applyInitPromptConfig(&values, promptValues) {
+		return values, nil
+	}
+
+	if err := config.Save(configPath, values); err != nil {
+		return config.Values{}, err
+	}
+
+	return values, nil
+}
+
+func applyInitPromptConfig(values *config.Values, promptValues initPrompt) bool {
+	configChanged := false
+
+	if promptValues.UserName != "" {
+		values.User = promptValues.UserName
+		configChanged = true
+	}
+	if promptValues.ProviderSite != "" {
+		values.Site = promptValues.ProviderSite
+		configChanged = true
+	}
+	if promptValues.ShouldPersistTestChoice() {
+		values.Scaffold.WriteTests = promptValues.TestDrivenChoice == testChoiceYes
+		configChanged = true
+	}
+	if promptValues.ShouldPersistGitChoice() {
+		initGit := promptValues.GitChoice == gitChoiceYes
+		values.Scaffold.InitGit = &initGit
+		configChanged = true
+	}
+
+	return configChanged
+}
+
+func resolveInitSiteAndUser(flagSite string, flagUser string, allowFull bool, values config.Values) (string, string, error) {
+	site := config.ResolveSite(flagSite, values)
+
+	user, err := config.ResolveUser(flagUser, values, site)
+	if err != nil {
+		if errors.Is(err, config.ErrMissingUser) {
+			return "", "", custom_errors.CreateInvalidInputErrorWithMessage("missing user; run go-toolkit config set-user <user>")
+		}
+
+		return "", "", err
+	}
+
+	allowCustomSite := allowFull || (flagSite == "" && values.Site != "") || (!config.IsKnownSite(site) && site != "")
+	if err := cmdutil.ValidateSite(site, allowCustomSite); err != nil {
+		return "", "", err
+	}
+
+	return site, user, nil
+}
+
+func resolveInitPackages(cmd *cobra.Command, promptRunner prompt.Runner, values config.Values, site string, user string, packageFlags []string, presetFlags []string, promptPackages []string) ([]string, error) {
+	installPackages, err := resolveInstallPackages(values, packageFlags, presetFlags, promptPackages)
+	if err != nil {
+		return nil, err
+	}
+
+	installPackages, err = assurePackageProviders(cmd, promptRunner, values, site, installPackages)
+	if err != nil {
+		return nil, err
+	}
+
+	return resolveModulePaths(installPackages, site, user)
+}
+
+func initModule(cmd *cobra.Command, commandRunner runner.Runner, moduleInput string, site string, user string, installPackages []string) (string, error) {
+	cmdutil.LogInfoIfProduction("init: resolving module path for %s", site)
+	modulePath, err := packagepath.ResolveModulePath(moduleInput, site, user)
+	if err != nil {
+		return "", err
+	}
+
+	cmdutil.LogInfoIfProduction("init: running go mod init")
+	if err := commandRunner.Run(cmd, "go", "mod", "init", modulePath); err != nil {
+		return "", err
+	}
+
+	if len(installPackages) == 0 {
+		return modulePath, nil
+	}
+
+	cmdutil.LogInfoIfProduction("init: installing packages")
+	args := append([]string{"get"}, installPackages...)
+	if err := commandRunner.Run(cmd, "go", args...); err != nil {
+		return "", err
+	}
+
+	return modulePath, nil
+}
+
+func applyInitLayout(cmd *cobra.Command, commandRunner runner.Runner, template string, shouldInitGit bool) error {
+	cmdutil.LogInfoIfProduction("init: creating project layout from %s template", template)
+	if err := project.EnsureLayout(".", project.Options{
+		Template:       template,
+		WriteGitIgnore: shouldInitGit,
+	}); err != nil {
+		return err
+	}
+
+	if !shouldInitGit {
+		cmdutil.LogInfoIfProduction("init: git init skipped")
+		return nil
+	}
+
+	if _, err := os.Stat(".git"); err == nil {
+		cmdutil.LogInfoIfProduction("init: git already initialized")
+		return nil
+	} else if !errors.Is(err, os.ErrNotExist) {
+		return err
+	}
+
+	cmdutil.LogInfoIfProduction("init: running git init")
+	return commandRunner.Run(cmd, "git", "init")
 }
 
 const (
