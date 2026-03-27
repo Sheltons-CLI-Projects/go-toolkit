@@ -8,7 +8,7 @@ import (
 	"runtime"
 	"strings"
 
-	"github.com/carapace-sh/carapace-shlex"
+	shlex "github.com/carapace-sh/carapace-shlex"
 	"github.com/charmbracelet/huh"
 	"github.com/louiss0/go-toolkit/custom_errors"
 	"github.com/louiss0/go-toolkit/custom_flags"
