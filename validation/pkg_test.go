@@ -94,6 +94,22 @@ var _ = Describe("RequiredShortPackageList", func() {
 	})
 })
 
+var _ = Describe("ParseToolList", func() {
+	It("parses bare tool names", func() {
+		packages, err := validation.ParseToolList("goimports stringer", "tools to install")
+
+		assert.NoError(err)
+		assert.Equal([]string{"goimports", "stringer"}, packages)
+	})
+
+	It("rejects package paths", func() {
+		_, err := validation.ParseToolList("github.com/spf13/cobra", "tools to install")
+
+		assert.Error(err)
+		assert.Contains(err.Error(), "tools to install must use space-separated tool names like goimports entries")
+	})
+})
+
 var _ = Describe("IsFullModulePath", func() {
 	It("accepts fully-qualified module paths", func() {
 		assert.True(validation.IsFullModulePath("github.com/samber/lo"))
@@ -112,5 +128,17 @@ var _ = Describe("IsShortPackagePath", func() {
 
 	It("rejects a third segment that is not a major version", func() {
 		assert.False(validation.IsShortPackagePath("onsi/ginkgo/release"))
+	})
+})
+
+var _ = Describe("IsToolName", func() {
+	It("accepts bare executable names", func() {
+		assert.True(validation.IsToolName("goimports"))
+		assert.True(validation.IsToolName("gofumpt"))
+	})
+
+	It("rejects package paths and domains", func() {
+		assert.False(validation.IsToolName("samber/lo"))
+		assert.False(validation.IsToolName("golang.org"))
 	})
 })

@@ -18,6 +18,7 @@ var (
 )
 
 const shortPackageListFormatMessage = "username/package or username/package/vN"
+const toolListFormatMessage = "tool names like goimports"
 
 func RequiredString(value string, field string) (string, error) {
 	trimmed := strings.TrimSpace(value)
@@ -125,6 +126,39 @@ func RequiredShortPackageList(value string, field string) ([]string, error) {
 	return packages, nil
 }
 
+func ParseToolList(value string, field string) ([]string, error) {
+	trimmed := strings.TrimSpace(value)
+	if trimmed == "" {
+		return nil, nil
+	}
+
+	packages := strings.Fields(trimmed)
+	if lo.ContainsBy(packages, func(packageName string) bool {
+		return !IsToolName(packageName)
+	}) {
+		return nil, custom_errors.CreateInvalidInputErrorWithMessage(
+			field + " must use space-separated " + toolListFormatMessage + " entries",
+		)
+	}
+
+	return packages, nil
+}
+
+func RequiredToolList(value string, field string) ([]string, error) {
+	packages, err := ParseToolList(value, field)
+	if err != nil {
+		return nil, err
+	}
+
+	if len(packages) == 0 {
+		return nil, custom_errors.CreateInvalidInputErrorWithMessage(
+			field + " must use space-separated " + toolListFormatMessage + " entries",
+		)
+	}
+
+	return packages, nil
+}
+
 func IsShortPackagePath(value string) bool {
 	parts := strings.Split(strings.TrimSpace(value), "/")
 	if len(parts) != 2 && len(parts) != 3 {
@@ -141,6 +175,19 @@ func IsShortPackagePath(value string) bool {
 	return lo.EveryBy(parts, func(part string) bool {
 		return part != "" && !strings.ContainsAny(part, ", \t\r\n")
 	})
+}
+
+func IsToolName(value string) bool {
+	trimmed := strings.TrimSpace(value)
+	if trimmed == "" {
+		return false
+	}
+
+	if strings.ContainsAny(trimmed, "/@. \t\r\n") {
+		return false
+	}
+
+	return true
 }
 
 func IsFullModulePath(value string) bool {

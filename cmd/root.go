@@ -90,6 +90,7 @@ It shortens common tasks like init, remove, and scaffold.`,
 		&cobra.Group{ID: "setup", Title: "Setup Commands"},
 		&cobra.Group{ID: "local-packages", Title: "Local Package Commands"},
 		&cobra.Group{ID: "global-packages", Title: "Global Package Commands"},
+		&cobra.Group{ID: "tools", Title: "Tool Commands"},
 		&cobra.Group{ID: "project", Title: "Project Commands"},
 	)
 
@@ -105,6 +106,7 @@ It shortens common tasks like init, remove, and scaffold.`,
 	installCmd := NewInstallCmd(commandRunner, promptRunner, &configPath)
 	uninstallCmd := NewUninstallCmd(commandRunner, promptRunner, &configPath)
 	installGlobalsCmd := NewInstallGlobalsCmd(commandRunner, &configPath)
+	toolCmd := NewToolCmd(commandRunner, promptRunner, &configPath)
 	initCmd.GroupID = "setup"
 	configCmd.GroupID = "setup"
 	addCmd.GroupID = "local-packages"
@@ -112,6 +114,7 @@ It shortens common tasks like init, remove, and scaffold.`,
 	installCmd.GroupID = "global-packages"
 	uninstallCmd.GroupID = "global-packages"
 	installGlobalsCmd.GroupID = "global-packages"
+	toolCmd.GroupID = "tools"
 	scaffoldCmd.GroupID = "project"
 	testCmd.GroupID = "project"
 	searchCmd.GroupID = "project"
@@ -127,6 +130,7 @@ It shortens common tasks like init, remove, and scaffold.`,
 		installCmd,
 		uninstallCmd,
 		installGlobalsCmd,
+		toolCmd,
 	)
 
 	configureCompletions(cmd, scaffoldCmd, configCmd)
