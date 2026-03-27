@@ -40,7 +40,8 @@ type ProviderConfig struct {
 }
 
 type ScaffoldConfig struct {
-	WriteTests bool `mapstructure:"write_tests" toml:"write_tests"`
+	WriteTests bool  `mapstructure:"write_tests" toml:"write_tests"`
+	InitGit    *bool `mapstructure:"init_git" toml:"init_git"`
 }
 
 var valuesSchema = gozod.FromStruct[Values]()
@@ -166,4 +167,12 @@ func KnownSiteLabel(site string) (string, bool) {
 
 func IsValidSite(site string) bool {
 	return validation.IsValidSite(site)
+}
+
+func ResolveInitGit(values Values) bool {
+	if values.Scaffold.InitGit == nil {
+		return true
+	}
+
+	return *values.Scaffold.InitGit
 }

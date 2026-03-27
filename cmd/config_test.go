@@ -36,6 +36,7 @@ var Config = Describe("config command", func() {
 		assert.Equal("lou", values.User)
 		assert.Equal("github.com", values.Site)
 		assert.False(values.AssureProviders)
+		assert.True(config.ResolveInitGit(values))
 	})
 
 	It("prompts for config init when no flags are provided", func() {
@@ -314,6 +315,25 @@ var Config = Describe("config command", func() {
 		values, err := config.Load(configPath)
 		assert.NoError(err)
 		assert.True(values.AssureProviders)
+	})
+
+	It("updates scaffold git defaults", func() {
+		runner := &testhelpers.RunnerMock{}
+		tempDir := GinkgoT().TempDir()
+		configPath := filepath.Join(tempDir, "config.toml")
+
+		rootCmd := cmd.NewRootCmdWithOptions(cmd.RootOptions{
+			Runner:       runner,
+			PromptRunner: testhelpers.NewPromptRunnerMock(),
+			ConfigPath:   configPath,
+		})
+
+		_, err := testhelpers.ExecuteCmd(rootCmd, "config", "set-scaffold-git", "false")
+		assert.NoError(err)
+
+		values, err := config.Load(configPath)
+		assert.NoError(err)
+		assert.False(config.ResolveInitGit(values))
 	})
 
 	It("adds global packages when full module paths are provided", func() {

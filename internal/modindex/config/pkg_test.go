@@ -82,10 +82,14 @@ var _ = Describe("ConfigLoadSave", func() {
 
 	It("round-trips config values", func() {
 		path := filepath.Join(GinkgoT().TempDir(), "config.toml")
+		initGit := false
 		values := config.Values{
 			User:            "lou",
 			Site:            "github.com",
 			AssureProviders: true,
+			Scaffold: config.ScaffoldConfig{
+				InitGit: &initGit,
+			},
 			Providers: []config.ProviderConfig{
 				{Name: "gitlab", Path: "/tmp/gitlab"},
 			},
@@ -140,6 +144,25 @@ var _ = Describe("ConfigLoadSave", func() {
 		err := config.Save(path, values)
 
 		assert.Error(err)
+	})
+})
+
+var _ = Describe("ResolveInitGit", func() {
+	assert := assert.New(GinkgoT())
+
+	It("defaults to true when unset", func() {
+		assert.True(config.ResolveInitGit(config.Values{}))
+	})
+
+	It("uses configured scaffold git defaults", func() {
+		initGit := false
+		values := config.Values{
+			Scaffold: config.ScaffoldConfig{
+				InitGit: &initGit,
+			},
+		}
+
+		assert.False(config.ResolveInitGit(values))
 	})
 })
 

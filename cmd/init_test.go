@@ -50,6 +50,12 @@ var Init = Describe("init command", func() {
 		assert.NoError(err)
 		_, err = os.Stat(filepath.Join(tempDir, "internal", "services", "service.go"))
 		assert.NoError(err)
+		_, err = os.Stat(filepath.Join(tempDir, ".gitignore"))
+		assert.NoError(err)
+		_, err = os.Stat(filepath.Join(tempDir, ".env"))
+		assert.NoError(err)
+		_, err = os.Stat(filepath.Join(tempDir, ".env.example"))
+		assert.NoError(err)
 
 		content, err := os.ReadFile(filepath.Join(tempDir, "cmd", "main.go"))
 		assert.NoError(err)
@@ -107,6 +113,8 @@ var Init = Describe("init command", func() {
 		assert.Error(err)
 		_, err = os.Stat(filepath.Join(tempDir, "external"))
 		assert.NoError(err)
+		_, err = os.Stat(filepath.Join(tempDir, ".gitignore"))
+		assert.Error(err)
 
 		var summary map[string]any
 		err = json.Unmarshal([]byte(output), &summary)
@@ -187,6 +195,74 @@ var Init = Describe("init command", func() {
 		_, err = os.Stat(filepath.Join(tempDir, "internal", "services", "service.go"))
 		assert.Error(err)
 		_, err = os.Stat(filepath.Join(tempDir, "external"))
+		assert.Error(err)
+		_, err = os.Stat(filepath.Join(tempDir, ".gitignore"))
+		assert.NoError(err)
+	})
+
+	It("skips git init and .gitignore when the git flag is false", func() {
+		runner := &testhelpers.RunnerMock{}
+		tempDir := GinkgoT().TempDir()
+		configPath := filepath.Join(tempDir, "config.toml")
+		workingDir, err := os.Getwd()
+		assert.NoError(err)
+
+		err = os.WriteFile(configPath, []byte("user = \"lou\"\nsite = \"github.com\"\n"), 0o644)
+		assert.NoError(err)
+
+		err = os.Chdir(tempDir)
+		assert.NoError(err)
+		DeferCleanup(func() {
+			_ = os.Chdir(workingDir)
+		})
+
+		rootCmd := cmd.NewRootCmdWithOptions(cmd.RootOptions{
+			Runner:       runner,
+			PromptRunner: testhelpers.NewPromptRunnerMock(),
+			ConfigPath:   configPath,
+		})
+
+		runner.On("Run", mock.Anything, "go", []string{"mod", "init", "github.com/lou/toolkit"}).Return(nil).Once()
+
+		_, err = testhelpers.ExecuteCmd(rootCmd, "init", "toolkit", "--git", "false")
+
+		assert.NoError(err)
+		runner.AssertNotCalled(GinkgoT(), "Run", mock.Anything, "git", mock.Anything)
+
+		_, err = os.Stat(filepath.Join(tempDir, ".gitignore"))
+		assert.Error(err)
+	})
+
+	It("uses configured scaffold git defaults", func() {
+		runner := &testhelpers.RunnerMock{}
+		tempDir := GinkgoT().TempDir()
+		configPath := filepath.Join(tempDir, "config.toml")
+		workingDir, err := os.Getwd()
+		assert.NoError(err)
+
+		err = os.WriteFile(configPath, []byte("user = \"lou\"\nsite = \"github.com\"\n[scaffold]\ninit_git = false\n"), 0o644)
+		assert.NoError(err)
+
+		err = os.Chdir(tempDir)
+		assert.NoError(err)
+		DeferCleanup(func() {
+			_ = os.Chdir(workingDir)
+		})
+
+		rootCmd := cmd.NewRootCmdWithOptions(cmd.RootOptions{
+			Runner:       runner,
+			PromptRunner: testhelpers.NewPromptRunnerMock(),
+			ConfigPath:   configPath,
+		})
+
+		runner.On("Run", mock.Anything, "go", []string{"mod", "init", "github.com/lou/toolkit"}).Return(nil).Once()
+
+		_, err = testhelpers.ExecuteCmd(rootCmd, "init", "toolkit")
+
+		assert.NoError(err)
+		runner.AssertNotCalled(GinkgoT(), "Run", mock.Anything, "git", mock.Anything)
+
+		_, err = os.Stat(filepath.Join(tempDir, ".gitignore"))
 		assert.Error(err)
 	})
 })

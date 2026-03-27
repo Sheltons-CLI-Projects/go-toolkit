@@ -11,8 +11,11 @@ import (
 	"github.com/louiss0/go-toolkit/validation"
 )
 
-//go:embed assets/templates
+//go:embed all:assets/templates
 var templateFiles embed.FS
+
+//go:embed assets/gitignore.tmpl
+var gitIgnoreTemplate string
 
 const (
 	TemplateAPI = "api"
@@ -21,7 +24,8 @@ const (
 )
 
 type Options struct {
-	Template string
+	Template       string
+	WriteGitIgnore bool
 }
 
 func EnsureLayout(root string, options Options) error {
@@ -39,7 +43,15 @@ func EnsureLayout(root string, options Options) error {
 		return err
 	}
 
-	return writeTemplate(root, templateTree)
+	if err := writeTemplate(root, templateTree); err != nil {
+		return err
+	}
+
+	if !options.WriteGitIgnore {
+		return nil
+	}
+
+	return os.WriteFile(filepath.Join(root, ".gitignore"), []byte(gitIgnoreTemplate), 0o644)
 }
 
 func TemplateValues() []string {

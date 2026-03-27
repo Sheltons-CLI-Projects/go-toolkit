@@ -34,6 +34,7 @@ func NewConfigCmd(commandRunner runner.Runner, configPath *string, promptRunner 
 	cmd.AddCommand(newConfigSetSiteCmd(configPath))
 	cmd.AddCommand(newConfigSetAssureProvidersCmd(configPath))
 	cmd.AddCommand(newConfigSetScaffoldTestsCmd(configPath))
+	cmd.AddCommand(newConfigSetScaffoldGitCmd(configPath))
 	cmd.AddCommand(newConfigProviderCmd(configPath))
 	cmd.AddCommand(newConfigPackagePresetCmd(configPath))
 	cmd.AddCommand(newConfigGlobalPackageCmd(configPath))
@@ -455,6 +456,33 @@ func newConfigSetScaffoldTestsCmd(configPath *string) *cobra.Command {
 			}
 
 			return cmdutil.WriteLine(cmd.OutOrStdout(), "scaffold tests updated")
+		},
+	}
+}
+
+func newConfigSetScaffoldGitCmd(configPath *string) *cobra.Command {
+	return &cobra.Command{
+		Use:   "set-scaffold-git <enabled>",
+		Short: "Enable or disable git initialization during init",
+		Args:  cobra.ExactArgs(1),
+		RunE: func(cmd *cobra.Command, args []string) error {
+			enabled, err := validation.ParseBool(args[0], "enabled")
+			if err != nil {
+				return err
+			}
+
+			cmdutil.LogInfoIfProduction("config set-scaffold-git: loading config")
+			values, err := config.Load(*configPath)
+			if err != nil {
+				return err
+			}
+
+			values.Scaffold.InitGit = &enabled
+			if err := config.Save(*configPath, values); err != nil {
+				return err
+			}
+
+			return cmdutil.WriteLine(cmd.OutOrStdout(), "scaffold git updated")
 		},
 	}
 }

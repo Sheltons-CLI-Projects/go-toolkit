@@ -21,6 +21,7 @@ import (
 func NewInitCmd(commandRunner runner.Runner, promptRunner prompt.Runner, configPath *string) *cobra.Command {
 	siteFlag := custom_flags.NewEmptyStringFlag("site")
 	userFlag := custom_flags.NewEmptyStringFlag("user")
+	gitFlag := custom_flags.NewBoolFlag("git")
 	templateFlag := custom_flags.NewUnionFlag(project.TemplateValues(), "template")
 	var allowFull bool
 	var packageFlags []string
@@ -70,6 +71,11 @@ func NewInitCmd(commandRunner runner.Runner, promptRunner prompt.Runner, configP
 			}
 			if promptValues.ShouldPersistTestChoice() {
 				values.Scaffold.WriteTests = promptValues.TestDrivenChoice == testChoiceYes
+				configChanged = true
+			}
+			if promptValues.ShouldPersistGitChoice() {
+				initGit := promptValues.GitChoice == gitChoiceYes
+				values.Scaffold.InitGit = &initGit
 				configChanged = true
 			}
 			if configChanged {
@@ -128,11 +134,12 @@ func NewInitCmd(commandRunner runner.Runner, promptRunner prompt.Runner, configP
 			}
 
 			template := resolveInitTemplate(templateFlag.String(), promptValues)
-			shouldInitGit := promptValues.ShouldInitGit()
+			shouldInitGit := resolveInitGit(gitFlag.String(), gitFlag.Value(), values, promptValues)
 
 			cmdutil.LogInfoIfProduction("init: creating project layout from %s template", template)
 			if err := project.EnsureLayout(".", project.Options{
-				Template: template,
+				Template:       template,
+				WriteGitIgnore: shouldInitGit,
 			}); err != nil {
 				return err
 			}
@@ -160,6 +167,7 @@ func NewInitCmd(commandRunner runner.Runner, promptRunner prompt.Runner, configP
 
 	cmd.Flags().Var(&userFlag, "user", "override the configured user")
 	cmd.Flags().Var(&siteFlag, "site", "override the configured site")
+	cmd.Flags().Var(&gitFlag, "git", "whether to initialize git and write .gitignore")
 	cmd.Flags().BoolVar(&allowFull, "full", false, "allow a custom module site")
 	cmd.Flags().Var(&templateFlag, "template", "project template to apply")
 	cmd.Flags().StringSliceVar(&packageFlags, "package", nil, "module paths to install after init")
@@ -210,16 +218,12 @@ func (p initPrompt) ShouldPersistTestChoice() bool {
 	return p.TestDrivenChoice == testChoiceYes || p.TestDrivenChoice == testChoiceNo
 }
 
-func (p initPrompt) ShouldInitGit() bool {
+func (p initPrompt) ShouldPersistGitChoice() bool {
 	if !p.Used {
-		return true
-	}
-
-	if p.GitChoice == gitChoiceNo {
 		return false
 	}
 
-	return true
+	return p.GitChoice == gitChoiceYes || p.GitChoice == gitChoiceNo
 }
 
 type initSummary struct {
@@ -435,4 +439,24 @@ func resolveInitTemplate(flagValue string, promptValues initPrompt) string {
 	}
 
 	return templateTypeAPI
+}
+
+func (p initPrompt) ShouldInitGit() bool {
+	if !p.Used {
+		return true
+	}
+
+	return p.GitChoice != gitChoiceNo
+}
+
+func resolveInitGit(flagValue string, initGit bool, values config.Values, promptValues initPrompt) bool {
+	if flagValue != "" {
+		return initGit
+	}
+
+	if promptValues.ShouldPersistGitChoice() {
+		return promptValues.GitChoice == gitChoiceYes
+	}
+
+	return config.ResolveInitGit(values)
 }
