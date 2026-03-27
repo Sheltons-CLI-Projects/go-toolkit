@@ -4,6 +4,7 @@ go 1.25
 
 require (
 	github.com/carapace-sh/carapace v1.11.2
+	github.com/carapace-sh/carapace-shlex v1.1.1
 	github.com/charmbracelet/fang v1.0.0
 	github.com/charmbracelet/huh v0.8.0
 	github.com/charmbracelet/log v0.4.2
@@ -25,7 +26,6 @@ require (
 	github.com/Masterminds/semver/v3 v3.4.0 // indirect
 	github.com/atotto/clipboard v0.1.4 // indirect
 	github.com/aymanbagabas/go-osc52/v2 v2.0.1 // indirect
-	github.com/carapace-sh/carapace-shlex v1.1.1 // indirect
 	github.com/catppuccin/go v0.3.0 // indirect
 	github.com/charmbracelet/bubbles v0.21.1-0.20250623103423-23b8fd6302d7 // indirect
 	github.com/charmbracelet/bubbletea v1.3.6 // indirect
