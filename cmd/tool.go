@@ -168,8 +168,8 @@ func NewToolRemoveCmd(commandRunner runner.Runner, promptRunner prompt.Runner, c
 func promptToolNames(cmd *cobra.Command, runner prompt.Runner) ([]string, error) {
 	toolInput, err := runner.Input(cmd, prompt.Input{
 		Title:       "Tools",
-		Description: "Use space-separated tool names like goimports or stringer.",
-		Placeholder: "goimports stringer",
+		Description: "Use tool names like goimports, or override with slash-separated paths.",
+		Placeholder: "goimports honnef.co/go/tools/cmd/staticcheck",
 		Validate: func(value string) error {
 			_, err := validation.RequiredToolList(value, "tools")
 			return err
@@ -189,9 +189,9 @@ func validateToolInputs(inputs []string) error {
 	}
 
 	if lo.ContainsBy(trimmedTools, func(input string) bool {
-		return !validation.IsToolName(input)
+		return !validation.IsToolName(input) && !validation.IsToolPath(input)
 	}) {
-		return custom_errors.CreateInvalidInputErrorWithMessage("tool names must be bare executable names like goimports")
+		return custom_errors.CreateInvalidInputErrorWithMessage("tools must be bare names like goimports or slash-separated paths")
 	}
 
 	return nil
@@ -199,6 +199,11 @@ func validateToolInputs(inputs []string) error {
 
 func resolveToolModulePaths(tools []string) []string {
 	return lo.Uniq(lo.Map(tools, func(tool string, _ int) string {
-		return toolModulePathPrefix + "/" + strings.TrimSpace(tool)
+		trimmedTool := strings.TrimSpace(tool)
+		if validation.IsToolPath(trimmedTool) {
+			return trimmedTool
+		}
+
+		return toolModulePathPrefix + "/" + trimmedTool
 	}))
 }

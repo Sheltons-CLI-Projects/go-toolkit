@@ -102,11 +102,11 @@ var _ = Describe("ParseToolList", func() {
 		assert.Equal([]string{"goimports", "stringer"}, packages)
 	})
 
-	It("rejects package paths", func() {
-		_, err := validation.ParseToolList("github.com/spf13/cobra", "tools to install")
+	It("rejects invalid tool tokens", func() {
+		_, err := validation.ParseToolList("github.com/spf13/cobra@latest", "tools to install")
 
 		assert.Error(err)
-		assert.Contains(err.Error(), "tools to install must use space-separated tool names like goimports entries")
+		assert.Contains(err.Error(), "tools to install must use space-separated tool names like goimports or slash-separated paths like mvdan.cc/gofumpt entries")
 	})
 })
 
@@ -140,5 +140,16 @@ var _ = Describe("IsToolName", func() {
 	It("rejects package paths and domains", func() {
 		assert.False(validation.IsToolName("samber/lo"))
 		assert.False(validation.IsToolName("golang.org"))
+	})
+})
+
+var _ = Describe("IsToolPath", func() {
+	It("accepts slash-separated tool paths", func() {
+		assert.True(validation.IsToolPath("mvdan.cc/gofumpt"))
+		assert.True(validation.IsToolPath("mvdan.cc/gofumpt"))
+	})
+
+	It("rejects values without a slash", func() {
+		assert.False(validation.IsToolPath("goimports"))
 	})
 })

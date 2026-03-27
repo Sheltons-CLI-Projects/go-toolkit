@@ -18,7 +18,7 @@ var (
 )
 
 const shortPackageListFormatMessage = "username/package or username/package/vN"
-const toolListFormatMessage = "tool names like goimports"
+const toolListFormatMessage = "tool names like goimports or slash-separated paths like mvdan.cc/gofumpt"
 
 func RequiredString(value string, field string) (string, error) {
 	trimmed := strings.TrimSpace(value)
@@ -134,7 +134,7 @@ func ParseToolList(value string, field string) ([]string, error) {
 
 	packages := strings.Fields(trimmed)
 	if lo.ContainsBy(packages, func(packageName string) bool {
-		return !IsToolName(packageName)
+		return !IsToolName(packageName) && !IsToolPath(packageName)
 	}) {
 		return nil, custom_errors.CreateInvalidInputErrorWithMessage(
 			field + " must use space-separated " + toolListFormatMessage + " entries",
@@ -188,6 +188,18 @@ func IsToolName(value string) bool {
 	}
 
 	return true
+}
+
+func IsToolPath(value string) bool {
+	trimmed := strings.TrimSpace(value)
+	parts := strings.Split(trimmed, "/")
+	if len(parts) < 2 {
+		return false
+	}
+
+	return lo.EveryBy(parts, func(part string) bool {
+		return part != "" && !strings.ContainsAny(part, "@ \t\r\n")
+	})
 }
 
 func IsFullModulePath(value string) bool {

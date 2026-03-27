@@ -63,6 +63,32 @@ var Tool = Describe("tool command", func() {
 		assert.Contains(output, "go install golang.org/x/tools/cmd/goimports@latest")
 	})
 
+	It("uses an explicit slash separated tool path override", func() {
+		runner := &testhelpers.RunnerMock{}
+		tempDir := GinkgoT().TempDir()
+		configPath := filepath.Join(tempDir, "config.toml")
+
+		err := writeDefaultConfig(configPath)
+		assert.NoError(err)
+
+		runner.On("Run", mock.Anything, "go", []string{"install", "mvdan.cc/gofumpt@latest"}).Return(nil).Once()
+
+		rootCmd := cmd.NewRootCmdWithOptions(cmd.RootOptions{
+			Runner:       runner,
+			PromptRunner: testhelpers.NewPromptRunnerMock(),
+			ConfigPath:   configPath,
+		})
+
+		_, err = testhelpers.ExecuteCmd(rootCmd, "tool", "add", "mvdan.cc/gofumpt")
+
+		assert.NoError(err)
+		runner.AssertExpectations(GinkgoT())
+
+		values, err := config.Load(configPath)
+		assert.NoError(err)
+		assert.Contains(values.GlobalPackages, "mvdan.cc/gofumpt")
+	})
+
 	It("uninstalls a tool from the x tools cmd path", func() {
 		runner := &testhelpers.RunnerMock{}
 		tempDir := GinkgoT().TempDir()
