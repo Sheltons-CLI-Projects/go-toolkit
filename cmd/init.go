@@ -3,6 +3,7 @@ package cmd
 import (
 	"errors"
 	"os"
+	"path/filepath"
 	"strings"
 
 	"github.com/charmbracelet/huh"
@@ -28,11 +29,16 @@ func NewInitCmd(commandRunner runner.Runner, promptRunner prompt.Runner, configP
 	var presetFlags []string
 
 	cmd := &cobra.Command{
-		Use:   "init [package]",
-		Short: "Initialize a Go module with a short package name",
+		Use:   "init [folder]",
+		Short: "Initialize a Go module in a target folder",
 		Args:  cobra.MaximumNArgs(1),
 		RunE: func(cmd *cobra.Command, args []string) error {
-			promptValues, moduleInput, err := collectInitInput(cmd, args, promptRunner)
+			values, err := config.Load(*configPath)
+			if err != nil {
+				return err
+			}
+
+			inputs, err := collectInitInput(cmd, args, promptRunner, values, siteFlag.String(), userFlag.String(), gitFlag.String())
 			if err != nil {
 				if errors.Is(err, huh.ErrUserAborted) {
 					return nil
@@ -40,7 +46,7 @@ func NewInitCmd(commandRunner runner.Runner, promptRunner prompt.Runner, configP
 				return err
 			}
 
-			values, err := loadAndPersistInitConfig(*configPath, promptValues)
+			values, err = persistInitConfig(*configPath, values, inputs.Prompt)
 			if err != nil {
 				return err
 			}
@@ -50,7 +56,7 @@ func NewInitCmd(commandRunner runner.Runner, promptRunner prompt.Runner, configP
 				return err
 			}
 
-			installPackages, err := resolveInitPackages(cmd, promptRunner, values, site, user, packageFlags, presetFlags, promptValues.Packages)
+			installPackages, err := resolveInitPackages(cmd, promptRunner, values, site, user, packageFlags, presetFlags, inputs.Prompt.Packages)
 			if err != nil {
 				if errors.Is(err, huh.ErrUserAborted) {
 					return nil
@@ -58,20 +64,20 @@ func NewInitCmd(commandRunner runner.Runner, promptRunner prompt.Runner, configP
 				return err
 			}
 
-			modulePath, err := initModule(cmd, commandRunner, moduleInput, site, user, installPackages)
+			modulePath, err := initModule(cmd, commandRunner, inputs.TargetPath, inputs.ModuleInput, site, user, installPackages)
 			if err != nil {
 				return err
 			}
 
-			template := resolveInitTemplate(templateFlag.String(), promptValues)
-			shouldInitGit := resolveInitGit(gitFlag.String(), gitFlag.Value(), values, promptValues)
-			if err := applyInitLayout(cmd, commandRunner, template, shouldInitGit); err != nil {
+			template := resolveInitTemplate(templateFlag.String(), inputs.Prompt)
+			shouldInitGit := resolveInitGit(gitFlag.String(), gitFlag.Value(), values, inputs.Prompt)
+			if err := applyInitLayout(cmd, commandRunner, inputs.TargetPath, template, shouldInitGit); err != nil {
 				return err
 			}
 
-			promptValues.Packages = installPackages
+			inputs.Prompt.Packages = installPackages
 
-			return writeInitSummary(cmd, modulePath, site, user, promptValues)
+			return writeInitSummary(cmd, modulePath, site, user, template, shouldInitGit, inputs.Prompt)
 		},
 	}
 
@@ -90,37 +96,57 @@ func NewInitCmd(commandRunner runner.Runner, promptRunner prompt.Runner, configP
 	return cmd
 }
 
-func collectInitInput(cmd *cobra.Command, args []string, promptRunner prompt.Runner) (initPrompt, string, error) {
+type initInput struct {
+	Prompt      initPrompt
+	TargetPath  string
+	ModuleInput string
+}
+
+func collectInitInput(cmd *cobra.Command, args []string, promptRunner prompt.Runner, values config.Values, flagSite string, flagUser string, flagGit string) (initInput, error) {
 	if len(args) > 0 {
-		moduleInput, err := validation.RequiredString(args[0], "module name")
+		targetPath, err := validation.RequiredString(args[0], "folder")
 		if err != nil {
-			return initPrompt{}, "", err
+			return initInput{}, err
 		}
 
-		return initPrompt{}, moduleInput, nil
+		promptValues, err := promptInitConfigInputs(cmd, promptRunner, values, flagSite, flagUser, flagGit)
+		if err != nil {
+			return initInput{}, err
+		}
+
+		cleanTargetPath := filepath.Clean(targetPath)
+		moduleInput := packagepath.NormalizePackageName(filepath.Base(cleanTargetPath))
+		moduleInput, err = validation.RequiredString(moduleInput, "module name")
+		if err != nil {
+			return initInput{}, err
+		}
+
+		return initInput{
+			Prompt:      promptValues,
+			TargetPath:  cleanTargetPath,
+			ModuleInput: moduleInput,
+		}, nil
 	}
 
 	cmdutil.LogInfoIfProduction("init: starting interactive prompt")
-	inputs, err := promptInitInputs(cmd, promptRunner)
+	promptValues, err := promptInitInputs(cmd, promptRunner)
 	if err != nil {
-		return initPrompt{}, "", err
+		return initInput{}, err
 	}
 
-	moduleInput, err := validation.RequiredString(inputs.ModuleName, "module name")
+	moduleInput, err := validation.RequiredString(promptValues.ModuleName, "module name")
 	if err != nil {
-		return initPrompt{}, "", err
+		return initInput{}, err
 	}
 
-	return inputs, moduleInput, nil
+	return initInput{
+		Prompt:      promptValues,
+		TargetPath:  ".",
+		ModuleInput: moduleInput,
+	}, nil
 }
 
-func loadAndPersistInitConfig(configPath string, promptValues initPrompt) (config.Values, error) {
-	cmdutil.LogInfoIfProduction("init: loading config")
-	values, err := config.Load(configPath)
-	if err != nil {
-		return config.Values{}, err
-	}
-
+func persistInitConfig(configPath string, values config.Values, promptValues initPrompt) (config.Values, error) {
 	if !applyInitPromptConfig(&values, promptValues) {
 		return values, nil
 	}
@@ -190,15 +216,19 @@ func resolveInitPackages(cmd *cobra.Command, promptRunner prompt.Runner, values 
 	return resolveModulePaths(installPackages, site, user)
 }
 
-func initModule(cmd *cobra.Command, commandRunner runner.Runner, moduleInput string, site string, user string, installPackages []string) (string, error) {
+func initModule(cmd *cobra.Command, commandRunner runner.Runner, targetPath string, moduleInput string, site string, user string, installPackages []string) (string, error) {
 	cmdutil.LogInfoIfProduction("init: resolving module path for %s", site)
 	modulePath, err := packagepath.ResolveModulePath(moduleInput, site, user)
 	if err != nil {
 		return "", err
 	}
 
+	if err := os.MkdirAll(targetPath, 0o755); err != nil {
+		return "", err
+	}
+
 	cmdutil.LogInfoIfProduction("init: running go mod init")
-	if err := commandRunner.Run(cmd, "go", "mod", "init", modulePath); err != nil {
+	if err := commandRunner.Run(cmd, "go", "-C", targetPath, "mod", "init", modulePath); err != nil {
 		return "", err
 	}
 
@@ -207,7 +237,7 @@ func initModule(cmd *cobra.Command, commandRunner runner.Runner, moduleInput str
 	}
 
 	cmdutil.LogInfoIfProduction("init: installing packages")
-	args := append([]string{"get"}, installPackages...)
+	args := append([]string{"-C", targetPath, "get"}, installPackages...)
 	if err := commandRunner.Run(cmd, "go", args...); err != nil {
 		return "", err
 	}
@@ -215,9 +245,9 @@ func initModule(cmd *cobra.Command, commandRunner runner.Runner, moduleInput str
 	return modulePath, nil
 }
 
-func applyInitLayout(cmd *cobra.Command, commandRunner runner.Runner, template string, shouldInitGit bool) error {
+func applyInitLayout(cmd *cobra.Command, commandRunner runner.Runner, targetPath string, template string, shouldInitGit bool) error {
 	cmdutil.LogInfoIfProduction("init: creating project layout from %s template", template)
-	if err := project.EnsureLayout(".", project.Options{
+	if err := project.EnsureLayout(targetPath, project.Options{
 		Template:       template,
 		WriteGitIgnore: shouldInitGit,
 	}); err != nil {
@@ -229,7 +259,7 @@ func applyInitLayout(cmd *cobra.Command, commandRunner runner.Runner, template s
 		return nil
 	}
 
-	if _, err := os.Stat(".git"); err == nil {
+	if _, err := os.Stat(filepath.Join(targetPath, ".git")); err == nil {
 		cmdutil.LogInfoIfProduction("init: git already initialized")
 		return nil
 	} else if !errors.Is(err, os.ErrNotExist) {
@@ -237,7 +267,7 @@ func applyInitLayout(cmd *cobra.Command, commandRunner runner.Runner, template s
 	}
 
 	cmdutil.LogInfoIfProduction("init: running git init")
-	return commandRunner.Run(cmd, "git", "init")
+	return commandRunner.Run(cmd, "git", "-C", targetPath, "init")
 }
 
 const (
@@ -460,12 +490,84 @@ func promptInitInputs(cmd *cobra.Command, runner prompt.Runner) (initPrompt, err
 	return promptValues, nil
 }
 
-func writeInitSummary(cmd *cobra.Command, modulePath string, site string, user string, prompt initPrompt) error {
-	projectType := prompt.TemplateType
-	if projectType == "" {
-		projectType = templateTypeAPI
+func promptInitConfigInputs(cmd *cobra.Command, runner prompt.Runner, values config.Values, flagSite string, flagUser string, flagGit string) (initPrompt, error) {
+	promptValues := initPrompt{}
+
+	if flagUser == "" && values.User == "" {
+		userName, err := runner.Input(cmd, prompt.Input{
+			Title:       "Username",
+			Placeholder: "lou",
+			Validate: func(value string) error {
+				_, err := validation.RequiredString(value, "username")
+				return err
+			},
+		})
+		if err != nil {
+			return initPrompt{}, err
+		}
+		promptValues.UserName = strings.TrimSpace(userName)
+		promptValues.Used = true
 	}
 
+	if flagSite == "" && values.Site == "" {
+		providerChoice, err := runner.Select(cmd, prompt.Select{
+			Title: "Provider",
+			Options: []prompt.Option{
+				{Label: "BitBucket", Value: "bitbucket.org"},
+				{Label: "Codeberg", Value: "codeberg.org"},
+				{Label: "GitHub", Value: "github.com"},
+				{Label: "GitLab", Value: "gitlab.com"},
+				{Label: "Gitea", Value: "gitea.com"},
+				{Label: "Custom", Value: providerCustom},
+			},
+		})
+		if err != nil {
+			return initPrompt{}, err
+		}
+
+		if providerChoice == providerCustom {
+			customSite, err := runner.Input(cmd, prompt.Input{
+				Title:       "Custom provider",
+				Placeholder: "github.com",
+				Validate: func(value string) error {
+					trimmed, err := validation.RequiredString(value, "provider")
+					if err != nil {
+						return err
+					}
+					return cmdutil.ValidateSite(trimmed, true)
+				},
+			})
+			if err != nil {
+				return initPrompt{}, err
+			}
+			promptValues.ProviderSite = strings.TrimSpace(customSite)
+		} else {
+			promptValues.ProviderSite = providerChoice
+		}
+
+		promptValues.Used = true
+	}
+
+	if flagGit == "" && values.Scaffold.InitGit == nil {
+		gitChoice, err := runner.Select(cmd, prompt.Select{
+			Title: "Use git init",
+			Options: []prompt.Option{
+				{Label: "Yes", Value: gitChoiceYes},
+				{Label: "No", Value: gitChoiceNo},
+			},
+		})
+		if err != nil {
+			return initPrompt{}, err
+		}
+
+		promptValues.GitChoice = gitChoice
+		promptValues.Used = true
+	}
+
+	return promptValues, nil
+}
+
+func writeInitSummary(cmd *cobra.Command, modulePath string, site string, user string, template string, shouldInitGit bool, prompt initPrompt) error {
 	testDriven := prompt.TestDrivenChoice
 	if testDriven == "" {
 		testDriven = testChoiceSkip
@@ -480,9 +582,9 @@ func writeInitSummary(cmd *cobra.Command, modulePath string, site string, user s
 		ModulePath:  modulePath,
 		Site:        site,
 		User:        user,
-		ProjectType: projectType,
+		ProjectType: template,
 		TestDriven:  testDriven,
-		GitInit:     prompt.ShouldInitGit(),
+		GitInit:     shouldInitGit,
 		Packages:    packages,
 	}
 

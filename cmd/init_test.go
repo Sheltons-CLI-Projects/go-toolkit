@@ -19,11 +19,13 @@ var Init = Describe("init command", func() {
 	It("inits a module using the registered user", func() {
 		runner := &testhelpers.RunnerMock{}
 		tempDir := GinkgoT().TempDir()
+		target := "toolkit"
+		targetPath := filepath.Join(tempDir, target)
 		configPath := filepath.Join(tempDir, "config.toml")
 		workingDir, err := os.Getwd()
 		assert.NoError(err)
 
-		err = os.WriteFile(configPath, []byte("user = \"lou\"\nsite = \"github.com\"\n"), 0o644)
+		err = os.WriteFile(configPath, []byte("user = \"lou\"\nsite = \"github.com\"\n[scaffold]\ninit_git = true\n"), 0o644)
 		assert.NoError(err)
 
 		err = os.Chdir(tempDir)
@@ -38,26 +40,26 @@ var Init = Describe("init command", func() {
 			ConfigPath:   configPath,
 		})
 
-		runner.On("Run", mock.Anything, "go", []string{"mod", "init", "github.com/lou/toolkit"}).Return(nil).Once()
-		runner.On("Run", mock.Anything, "git", []string{"init"}).Return(nil).Once()
+		runner.On("Run", mock.Anything, "go", []string{"-C", target, "mod", "init", "github.com/lou/toolkit"}).Return(nil).Once()
+		runner.On("Run", mock.Anything, "git", []string{"-C", target, "init"}).Return(nil).Once()
 
 		_, err = testhelpers.ExecuteCmd(rootCmd, "init", "toolkit")
 
 		assert.NoError(err)
 		runner.AssertExpectations(GinkgoT())
 
-		_, err = os.Stat(filepath.Join(tempDir, "internal"))
+		_, err = os.Stat(filepath.Join(targetPath, "internal"))
 		assert.NoError(err)
-		_, err = os.Stat(filepath.Join(tempDir, "internal", "services", "service.go"))
+		_, err = os.Stat(filepath.Join(targetPath, "internal", "services", "service.go"))
 		assert.NoError(err)
-		_, err = os.Stat(filepath.Join(tempDir, ".gitignore"))
+		_, err = os.Stat(filepath.Join(targetPath, ".gitignore"))
 		assert.NoError(err)
-		_, err = os.Stat(filepath.Join(tempDir, ".env"))
+		_, err = os.Stat(filepath.Join(targetPath, ".env"))
 		assert.NoError(err)
-		_, err = os.Stat(filepath.Join(tempDir, ".env.example"))
+		_, err = os.Stat(filepath.Join(targetPath, ".env.example"))
 		assert.NoError(err)
 
-		content, err := os.ReadFile(filepath.Join(tempDir, "cmd", "main.go"))
+		content, err := os.ReadFile(filepath.Join(targetPath, "cmd", "main.go"))
 		assert.NoError(err)
 		assert.Contains(string(content), "package main")
 	})
@@ -91,8 +93,8 @@ var Init = Describe("init command", func() {
 			ConfigPath:   configPath,
 		})
 
-		runner.On("Run", mock.Anything, "go", []string{"mod", "init", "github.com/lou/toolkit"}).Return(nil).Once()
-		runner.On("Run", mock.Anything, "go", []string{"get", "github.com/samber/lo"}).Return(nil).Once()
+		runner.On("Run", mock.Anything, "go", []string{"-C", ".", "mod", "init", "github.com/lou/toolkit"}).Return(nil).Once()
+		runner.On("Run", mock.Anything, "go", []string{"-C", ".", "get", "github.com/samber/lo"}).Return(nil).Once()
 
 		output, err := testhelpers.ExecuteCmd(rootCmd, "init")
 
@@ -126,11 +128,12 @@ var Init = Describe("init command", func() {
 	It("installs packages from flags and presets", func() {
 		runner := &testhelpers.RunnerMock{}
 		tempDir := GinkgoT().TempDir()
+		target := "toolkit"
 		configPath := filepath.Join(tempDir, "config.toml")
 		workingDir, err := os.Getwd()
 		assert.NoError(err)
 
-		err = os.WriteFile(configPath, []byte("user = \"lou\"\nsite = \"github.com\"\n[package_presets]\ncli = [\"github.com/spf13/cobra\", \"github.com/spf13/viper\"]\n"), 0o644)
+		err = os.WriteFile(configPath, []byte("user = \"lou\"\nsite = \"github.com\"\n[scaffold]\ninit_git = true\n[package_presets]\ncli = [\"github.com/spf13/cobra\", \"github.com/spf13/viper\"]\n"), 0o644)
 		assert.NoError(err)
 
 		err = os.Chdir(tempDir)
@@ -145,9 +148,9 @@ var Init = Describe("init command", func() {
 			ConfigPath:   configPath,
 		})
 
-		runner.On("Run", mock.Anything, "go", []string{"mod", "init", "github.com/lou/toolkit"}).Return(nil).Once()
-		runner.On("Run", mock.Anything, "go", []string{"get", "github.com/onsi/ginkgo/v2", "github.com/spf13/cobra", "github.com/spf13/viper"}).Return(nil).Once()
-		runner.On("Run", mock.Anything, "git", []string{"init"}).Return(nil).Once()
+		runner.On("Run", mock.Anything, "go", []string{"-C", target, "mod", "init", "github.com/lou/toolkit"}).Return(nil).Once()
+		runner.On("Run", mock.Anything, "go", []string{"-C", target, "get", "github.com/onsi/ginkgo/v2", "github.com/spf13/cobra", "github.com/spf13/viper"}).Return(nil).Once()
+		runner.On("Run", mock.Anything, "git", []string{"-C", target, "init"}).Return(nil).Once()
 
 		output, err := testhelpers.ExecuteCmd(rootCmd, "init", "toolkit", "--package", "github.com/onsi/ginkgo/v2", "--preset", "cli")
 
@@ -162,11 +165,13 @@ var Init = Describe("init command", func() {
 	It("applies the cli template from the flag", func() {
 		runner := &testhelpers.RunnerMock{}
 		tempDir := GinkgoT().TempDir()
+		target := "toolkit"
+		targetPath := filepath.Join(tempDir, target)
 		configPath := filepath.Join(tempDir, "config.toml")
 		workingDir, err := os.Getwd()
 		assert.NoError(err)
 
-		err = os.WriteFile(configPath, []byte("user = \"lou\"\nsite = \"github.com\"\n"), 0o644)
+		err = os.WriteFile(configPath, []byte("user = \"lou\"\nsite = \"github.com\"\n[scaffold]\ninit_git = true\n"), 0o644)
 		assert.NoError(err)
 
 		err = os.Chdir(tempDir)
@@ -181,28 +186,30 @@ var Init = Describe("init command", func() {
 			ConfigPath:   configPath,
 		})
 
-		runner.On("Run", mock.Anything, "go", []string{"mod", "init", "github.com/lou/toolkit"}).Return(nil).Once()
-		runner.On("Run", mock.Anything, "git", []string{"init"}).Return(nil).Once()
+		runner.On("Run", mock.Anything, "go", []string{"-C", target, "mod", "init", "github.com/lou/toolkit"}).Return(nil).Once()
+		runner.On("Run", mock.Anything, "git", []string{"-C", target, "init"}).Return(nil).Once()
 
 		_, err = testhelpers.ExecuteCmd(rootCmd, "init", "toolkit", "--template", "cli")
 
 		assert.NoError(err)
 
-		_, err = os.Stat(filepath.Join(tempDir, "cmd", "root.go"))
+		_, err = os.Stat(filepath.Join(targetPath, "cmd", "root.go"))
 		assert.NoError(err)
-		_, err = os.Stat(filepath.Join(tempDir, "internal"))
+		_, err = os.Stat(filepath.Join(targetPath, "internal"))
 		assert.NoError(err)
-		_, err = os.Stat(filepath.Join(tempDir, "internal", "services", "service.go"))
+		_, err = os.Stat(filepath.Join(targetPath, "internal", "services", "service.go"))
 		assert.Error(err)
-		_, err = os.Stat(filepath.Join(tempDir, "external"))
+		_, err = os.Stat(filepath.Join(targetPath, "external"))
 		assert.Error(err)
-		_, err = os.Stat(filepath.Join(tempDir, ".gitignore"))
+		_, err = os.Stat(filepath.Join(targetPath, ".gitignore"))
 		assert.NoError(err)
 	})
 
 	It("skips git init and .gitignore when the git flag is false", func() {
 		runner := &testhelpers.RunnerMock{}
 		tempDir := GinkgoT().TempDir()
+		target := "toolkit"
+		targetPath := filepath.Join(tempDir, target)
 		configPath := filepath.Join(tempDir, "config.toml")
 		workingDir, err := os.Getwd()
 		assert.NoError(err)
@@ -222,20 +229,22 @@ var Init = Describe("init command", func() {
 			ConfigPath:   configPath,
 		})
 
-		runner.On("Run", mock.Anything, "go", []string{"mod", "init", "github.com/lou/toolkit"}).Return(nil).Once()
+		runner.On("Run", mock.Anything, "go", []string{"-C", target, "mod", "init", "github.com/lou/toolkit"}).Return(nil).Once()
 
 		_, err = testhelpers.ExecuteCmd(rootCmd, "init", "toolkit", "--git", "false")
 
 		assert.NoError(err)
 		runner.AssertNotCalled(GinkgoT(), "Run", mock.Anything, "git", mock.Anything)
 
-		_, err = os.Stat(filepath.Join(tempDir, ".gitignore"))
+		_, err = os.Stat(filepath.Join(targetPath, ".gitignore"))
 		assert.Error(err)
 	})
 
 	It("uses configured scaffold git defaults", func() {
 		runner := &testhelpers.RunnerMock{}
 		tempDir := GinkgoT().TempDir()
+		target := "toolkit"
+		targetPath := filepath.Join(tempDir, target)
 		configPath := filepath.Join(tempDir, "config.toml")
 		workingDir, err := os.Getwd()
 		assert.NoError(err)
@@ -255,14 +264,64 @@ var Init = Describe("init command", func() {
 			ConfigPath:   configPath,
 		})
 
-		runner.On("Run", mock.Anything, "go", []string{"mod", "init", "github.com/lou/toolkit"}).Return(nil).Once()
+		runner.On("Run", mock.Anything, "go", []string{"-C", target, "mod", "init", "github.com/lou/toolkit"}).Return(nil).Once()
 
 		_, err = testhelpers.ExecuteCmd(rootCmd, "init", "toolkit")
 
 		assert.NoError(err)
 		runner.AssertNotCalled(GinkgoT(), "Run", mock.Anything, "git", mock.Anything)
 
-		_, err = os.Stat(filepath.Join(tempDir, ".gitignore"))
+		_, err = os.Stat(filepath.Join(targetPath, ".gitignore"))
 		assert.Error(err)
+	})
+
+	It("prompts for missing config when a target folder is provided", func() {
+		runner := &testhelpers.RunnerMock{}
+		tempDir := GinkgoT().TempDir()
+		target := "toolkit"
+		targetPath := filepath.Join(tempDir, target)
+		configPath := filepath.Join(tempDir, "config.toml")
+		workingDir, err := os.Getwd()
+		assert.NoError(err)
+
+		err = os.WriteFile(configPath, []byte("site = \"gitlab.com\"\n"), 0o644)
+		assert.NoError(err)
+
+		err = os.Chdir(tempDir)
+		assert.NoError(err)
+		DeferCleanup(func() {
+			_ = os.Chdir(workingDir)
+		})
+
+		promptRunner := testhelpers.NewPromptRunnerMock(
+			testhelpers.PromptStep{Kind: testhelpers.PromptStepInput, Value: "lou"},
+			testhelpers.PromptStep{Kind: testhelpers.PromptStepSelect, Value: "yes"},
+		)
+
+		rootCmd := cmd.NewRootCmdWithOptions(cmd.RootOptions{
+			Runner:       runner,
+			PromptRunner: promptRunner,
+			ConfigPath:   configPath,
+		})
+
+		runner.On("Run", mock.Anything, "go", []string{"-C", target, "mod", "init", "gitlab.com/lou/toolkit"}).Return(nil).Once()
+		runner.On("Run", mock.Anything, "git", []string{"-C", target, "init"}).Return(nil).Once()
+
+		_, err = testhelpers.ExecuteCmd(rootCmd, "init", "toolkit")
+
+		assert.NoError(err)
+
+		values, err := config.Load(configPath)
+		assert.NoError(err)
+		assert.Equal("lou", values.User)
+		assert.Equal("gitlab.com", values.Site)
+		if assert.NotNil(values.Scaffold.InitGit) {
+			assert.True(*values.Scaffold.InitGit)
+		}
+
+		_, err = os.Stat(filepath.Join(targetPath, "go.mod"))
+		assert.True(os.IsNotExist(err))
+		_, err = os.Stat(filepath.Join(targetPath, ".gitignore"))
+		assert.NoError(err)
 	})
 })
