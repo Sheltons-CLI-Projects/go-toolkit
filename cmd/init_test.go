@@ -109,6 +109,8 @@ var Init = Describe("init command", func() {
 
 		_, err = os.Stat(filepath.Join(tempDir, "cmd", "main.go"))
 		assert.Error(err)
+		_, err = os.Stat(filepath.Join(tempDir, "main.go"))
+		assert.NoError(err)
 		_, err = os.Stat(filepath.Join(tempDir, "internal"))
 		assert.NoError(err)
 		_, err = os.Stat(filepath.Join(tempDir, "internal", "services", "service.go"))
@@ -117,6 +119,14 @@ var Init = Describe("init command", func() {
 		assert.NoError(err)
 		_, err = os.Stat(filepath.Join(tempDir, ".gitignore"))
 		assert.Error(err)
+
+		content, err := os.ReadFile(filepath.Join(tempDir, "main.go"))
+		assert.NoError(err)
+		assert.Contains(string(content), "package main")
+
+		content, err = os.ReadFile(filepath.Join(tempDir, "internal", "internal.go"))
+		assert.NoError(err)
+		assert.Contains(string(content), "package internal")
 
 		var summary map[string]any
 		err = json.Unmarshal([]byte(output), &summary)
