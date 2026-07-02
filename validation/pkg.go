@@ -15,6 +15,7 @@ var (
 	siteSchema           = gozod.String().Regex(regexp.MustCompile(`^[^\s.][^\s]*\.[^\s]*[^\s.]$`))
 	booleanStringSchema  = gozod.String().Regex(regexp.MustCompile(`(?i)^(1|0|t|f|true|false)$`))
 	versionSegmentSchema = regexp.MustCompile(`^v[0-9].*$`)
+	binaryNameSchema     = regexp.MustCompile(`^[A-Za-z0-9][A-Za-z0-9_-]*$`)
 )
 
 const shortPackageListFormatMessage = "username/package or username/package/vN"
@@ -188,6 +189,15 @@ func IsToolName(value string) bool {
 	}
 
 	return true
+}
+
+func IsBinaryName(value string) bool {
+	trimmed := strings.TrimSpace(value)
+	if trimmed == "" {
+		return false
+	}
+
+	return binaryNameSchema.MatchString(trimmed)
 }
 
 func IsToolPath(value string) bool {

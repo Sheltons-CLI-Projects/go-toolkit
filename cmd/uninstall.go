@@ -2,32 +2,30 @@ package cmd
 
 import (
 	"errors"
+	"os"
+	"path/filepath"
+	"runtime"
 	"strings"
 
 	"github.com/charmbracelet/huh"
 	"github.com/louiss0/go-toolkit/custom_errors"
-	"github.com/louiss0/go-toolkit/custom_flags"
 	"github.com/louiss0/go-toolkit/internal/cmdutil"
 	"github.com/louiss0/go-toolkit/internal/modindex/config"
 	"github.com/louiss0/go-toolkit/internal/prompt"
 	"github.com/louiss0/go-toolkit/internal/runner"
+	"github.com/louiss0/go-toolkit/validation"
 	"github.com/samber/lo"
 	"github.com/spf13/cobra"
 )
 
-func NewUninstallCmd(commandRunner runner.Runner, promptRunner prompt.Runner, configPath *string) *cobra.Command {
-	siteFlag := custom_flags.NewEmptyStringFlag("site")
-	userFlag := custom_flags.NewEmptyStringFlag("user")
-	var allowFull bool
+func NewUninstallCmd(_ runner.Runner, promptRunner prompt.Runner, configPath *string) *cobra.Command {
 	var dryRun bool
-	var presetFlags []string
-	var packageFlags []string
 
 	cmd := &cobra.Command{
-		Use:   "uninstall [package] [packages...]",
-		Short: "Uninstall Go binaries globally and remove them from the global package list",
+		Use:   "uninstall [binary] [binaries...]",
+		Short: "Remove binaries from GOBIN and clear matching global package entries",
 		Args: func(cmd *cobra.Command, args []string) error {
-			return validateInstallInputs(args)
+			return validateBinaryInputs(args)
 		},
 		RunE: func(cmd *cobra.Command, args []string) error {
 			values, err := config.Load(*configPath)
@@ -35,83 +33,48 @@ func NewUninstallCmd(commandRunner runner.Runner, promptRunner prompt.Runner, co
 				return err
 			}
 
-			promptPackages := []string(nil)
-			if len(args) == 0 && len(packageFlags) == 0 && len(presetFlags) == 0 {
-				inputs, err := promptInstallPackages(cmd, promptRunner)
+			targetBinaries := append([]string{}, args...)
+			if len(targetBinaries) == 0 {
+				inputs, err := promptBinaryNames(cmd, promptRunner)
 				if err != nil {
 					if errors.Is(err, huh.ErrUserAborted) {
 						return nil
 					}
 					return err
 				}
-				promptPackages = inputs
+				targetBinaries = inputs
 			}
 
-			installPackages, err := resolveInstallPackages(values, packageFlags, presetFlags, promptPackages)
-			if err != nil {
-				return err
+			if len(targetBinaries) == 0 {
+				return custom_errors.CreateInvalidInputErrorWithMessage("at least one binary is required")
 			}
-			targetPackages := append([]string{}, args...)
-			targetPackages = append(targetPackages, installPackages...)
-			if len(targetPackages) == 0 {
-				return custom_errors.CreateInvalidInputErrorWithMessage("at least one package or preset is required")
-			}
-			if err := validateInstallInputs(targetPackages); err != nil {
+			if err := validateBinaryInputs(targetBinaries); err != nil {
 				return err
 			}
 
-			site := config.ResolveSite(siteFlag.String(), values)
-			user, err := config.ResolveUser(userFlag.String(), values, site)
-			if err != nil {
-				if errors.Is(err, config.ErrMissingUser) {
-					return custom_errors.CreateInvalidInputErrorWithMessage("missing user; run go-toolkit config set-user <user>")
-				}
-				return err
-			}
-
-			allowCustomSite := allowFull || (siteFlag.String() == "" && values.Site != "")
-			if err := cmdutil.ValidateSite(site, allowCustomSite); err != nil {
-				return err
-			}
-
-			targetPackages, err = assurePackageProviders(cmd, promptRunner, values, site, targetPackages)
-			if err != nil {
-				if errors.Is(err, huh.ErrUserAborted) {
-					return nil
-				}
-				return err
-			}
-
-			cmdutil.LogInfoIfProduction("uninstall: resolving module paths for %s", site)
-			modulePaths, err := resolveModulePaths(targetPackages, site, user)
+			gobin, err := resolveGoBin()
 			if err != nil {
 				return err
 			}
 
-			basePaths := lo.Map(modulePaths, func(modulePath string, _ int) string {
-				return strings.Split(modulePath, "@")[0]
+			binaryPaths := lo.Map(targetBinaries, func(binaryName string, _ int) string {
+				return filepath.Join(gobin, executableFileName(binaryName))
 			})
-
 			if dryRun {
-				cmdutil.LogInfoIfProduction("uninstall: dry run output")
-				lines := lo.Map(basePaths, func(modulePath string, _ int) string {
-					return "go clean -i " + modulePath
-				})
-				return cmdutil.WriteLine(cmd.OutOrStdout(), strings.Join(lines, "\n"))
+				return cmdutil.WriteLine(cmd.OutOrStdout(), strings.Join(binaryPaths, "\n"))
 			}
 
-			cmdutil.LogInfoIfProduction("uninstall: executing go clean -i")
-			for _, modulePath := range basePaths {
-				if err := commandRunner.Run(cmd, "go", "clean", "-i", modulePath); err != nil {
+			for _, binaryPath := range binaryPaths {
+				if err := os.Remove(binaryPath); err != nil {
 					return err
 				}
 			}
 
-			removeSet := lo.SliceToMap(basePaths, func(modulePath string) (string, struct{}) {
-				return modulePath, struct{}{}
+			removeSet := lo.SliceToMap(targetBinaries, func(binaryName string) (string, struct{}) {
+				return binaryName, struct{}{}
 			})
 			values.GlobalPackages = lo.Filter(values.GlobalPackages, func(modulePath string, _ int) bool {
-				_, shouldRemove := removeSet[modulePath]
+				_, shouldRemove := removeSet[moduleBinaryName(modulePath)]
 				return !shouldRemove
 			})
 			if err := config.Save(*configPath, values); err != nil {
@@ -122,13 +85,93 @@ func NewUninstallCmd(commandRunner runner.Runner, promptRunner prompt.Runner, co
 		},
 	}
 
-	cmd.Flags().Var(&userFlag, "user", "override the configured user")
-	cmd.Flags().Var(&siteFlag, "site", "override the configured site")
-	cmd.Flags().BoolVar(&allowFull, "full", false, "allow a custom module site")
-	cmd.Flags().BoolVar(&dryRun, "dry-run", false, "print the go command without running it")
-	cmd.Flags().StringSliceVar(&packageFlags, "package", nil, "package preset entries or module paths to uninstall")
-	cmd.Flags().StringSliceVar(&presetFlags, "preset", nil, "package preset names to uninstall")
-	cmdutil.RegisterSiteCompletion(cmd, "site")
+	cmd.Flags().BoolVar(&dryRun, "dry-run", false, "print the binary paths without deleting them")
 
 	return cmd
+}
+
+func promptBinaryNames(cmd *cobra.Command, runner prompt.Runner) ([]string, error) {
+	binaryInput, err := runner.Input(cmd, prompt.Input{
+		Title:       "Binaries to uninstall",
+		Description: "Use space-separated binary names like ginkgo or goimports.",
+		Placeholder: "ginkgo goimports",
+		Validate: func(value string) error {
+			_, err := validation.NonEmptyStrings(strings.Fields(value), "binary names")
+			if err != nil {
+				return err
+			}
+			return validateBinaryInputs(strings.Fields(value))
+		},
+	})
+	if err != nil {
+		return nil, err
+	}
+
+	binaryNames := strings.Fields(binaryInput)
+	if err := validateBinaryInputs(binaryNames); err != nil {
+		return nil, err
+	}
+
+	return binaryNames, nil
+}
+
+func validateBinaryInputs(inputs []string) error {
+	trimmedInputs, err := validation.NonEmptyStrings(inputs, "binary names")
+	if err != nil {
+		return err
+	}
+
+	if lo.ContainsBy(trimmedInputs, func(input string) bool {
+		return !validation.IsBinaryName(input)
+	}) {
+		return custom_errors.CreateInvalidInputErrorWithMessage("binaries must be bare command names using letters, numbers, underscores, or hyphens")
+	}
+
+	return nil
+}
+
+func resolveGoBin() (string, error) {
+	gobin, ok := os.LookupEnv("GOBIN")
+	trimmedGoBin := strings.TrimSpace(gobin)
+	if !ok || trimmedGoBin == "" {
+		return "", custom_errors.CreateInvalidInputErrorWithMessage("GOBIN must be set to uninstall binaries")
+	}
+
+	return trimmedGoBin, nil
+}
+
+func executableFileName(binaryName string) string {
+	if runtime.GOOS == "windows" {
+		return binaryName + ".exe"
+	}
+
+	return binaryName
+}
+
+func moduleBinaryName(modulePath string) string {
+	parts := strings.Split(strings.TrimSpace(modulePath), "/")
+	if len(parts) == 0 {
+		return ""
+	}
+
+	lastPart := parts[len(parts)-1]
+	if len(parts) > 1 && versionLikePart(lastPart) {
+		return parts[len(parts)-2]
+	}
+
+	return lastPart
+}
+
+func versionLikePart(value string) bool {
+	if len(value) < 2 || value[0] != 'v' {
+		return false
+	}
+
+	for _, char := range value[1:] {
+		if char < '0' || char > '9' {
+			return false
+		}
+	}
+
+	return true
 }

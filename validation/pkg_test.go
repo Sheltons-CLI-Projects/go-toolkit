@@ -153,3 +153,18 @@ var _ = Describe("IsToolPath", func() {
 		assert.False(validation.IsToolPath("goimports"))
 	})
 })
+
+var _ = Describe("IsBinaryName", func() {
+	It("accepts bare command names", func() {
+		assert.True(validation.IsBinaryName("ginkgo"))
+		assert.True(validation.IsBinaryName("goimports"))
+		assert.True(validation.IsBinaryName("my-tool_2"))
+	})
+
+	It("rejects paths and extra punctuation", func() {
+		assert.False(validation.IsBinaryName("github.com/onsi/ginkgo/v2"))
+		assert.False(validation.IsBinaryName("ginkgo.exe"))
+		assert.False(validation.IsBinaryName("ginkgo@latest"))
+		assert.False(validation.IsBinaryName(""))
+	})
+})
